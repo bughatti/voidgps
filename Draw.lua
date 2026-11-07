@@ -117,8 +117,9 @@ function provider:RefreshAllData()
 end
 
 ----------------------------------------------------------------------
--- Minimap: dots every 8 yards along the way ahead, inside the minimap
+-- Minimap: small dots along the way ahead, DOT_GAP pixels apart, inside the minimap
 ----------------------------------------------------------------------
+local DOT_GAP, DOT_SIZE = 9, 3
 local dots, nDots = {}, 0
 local holder
 
@@ -128,7 +129,7 @@ local function dot()
     if not t then
         t = holder:CreateTexture(nil, "OVERLAY")
         t:SetTexture("Interface\\Buttons\\WHITE8X8")
-        t:SetSize(4, 4)
+        t:SetSize(DOT_SIZE, DOT_SIZE)
         dots[nDots] = t
     end
     t:Show()
@@ -169,7 +170,9 @@ local function minimapUpdate()
                     local win = (radius * 1.5) / yards
                     t0, t1 = math.max(0, tc - win), math.min(1, tc + win)
                 end
-                local n = math.max(1, math.floor((t1 - t0) * yards / 8))
+                -- spaced on screen, not in yards: zoomed in (a city) 8-yard dots merged into a
+                -- thick solid line (the user, 2026-11-07)
+                local n = math.max(1, math.floor((t1 - t0) * yards * scale / DOT_GAP))
                 for i = 0, (t1 >= t0) and n or -1 do
                     if nDots >= 160 then break end
                     local t = t0 + (t1 - t0) * i / n
@@ -179,7 +182,7 @@ local function minimapUpdate()
                     if rotate then sx, sy = sx * cosF + sy * sinF, -sx * sinF + sy * cosF end
                     if sx * sx + sy * sy <= lim then
                         local d = dot()
-                        d:SetVertexColor(s[5][1], s[5][2], s[5][3], 0.95)
+                        d:SetVertexColor(s[5][1], s[5][2], s[5][3], 0.75)
                         d:ClearAllPoints()
                         d:SetPoint("CENTER", Minimap, "CENTER", sx, sy)
                     end

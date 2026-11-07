@@ -43,7 +43,7 @@ For a rare that doesn't always spawn, or any NPC you're heading to:
 
 ## Credits
 
-The WoW Forever NPC, rare, object, herb, ore and zeppelin data comes from **NorgannonDB** (GPL-3.0), built on **QuestieDB** and pfQuest. Thank you to both projects.
+The WoW Forever NPC, rare, object, herb, ore, vendor recipe and zeppelin data comes from **NorgannonDB** (GPL-3.0), built on **QuestieDB** and pfQuest. Thank you to both projects.
 
 ---
 

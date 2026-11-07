@@ -1,5 +1,12 @@
 # VoidGPS Changelog
 
+## 0.3.0
+
+- **Which vendor sells which recipe** (677 recipes, 1,439 vendor offers, holiday vendors left out, with skill needed, price and limited stock), for VoidProf's "recipes from vendors" lists and zone popups. A click there starts a VoidGPS route to the nearest vendor.
+- **A lighter route on the minimap:** smaller dots spaced evenly on screen. Zoomed in (in a city) they ran together into a thick line.
+- A route to a vendor no longer shows the Target button (that one is for rares).
+- **Holiday vendors say so:** Winter Veil, Hallow's End, Brewfest and Darkmoon Faire vendors show "· Winter Veil only" (and so on) in search; they were listed as if they stood in town all year.
+
 ## 0.2.0
 
 - **Herbs and ore:** type "briarthorn", "tin vein" or just "herb" / "ore" and VoidGPS routes you to the nearest spot it can spawn: over 25,000 spots for every Classic herb and ore (and Forever's new ones). One arrow target, no dots on the map. Picked already? Choose it again for the next nearest.
