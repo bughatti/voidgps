@@ -58,11 +58,28 @@ function H:Anchor(box)
     apply(self.name)
 end
 
+-- Any rare, not only the one you're heading to (the user, 2026-11-07, after Rathorian):
+-- a sound and "<name> is up!" the first time you see it, then quiet for 5 minutes.
+local seenRare = {}
+local function anyRare(unit, name)
+    if VoidGPSDB and VoidGPSDB.rareAlerts == false then return end
+    local cls = UnitClassification(unit)
+    if cls ~= "rare" and cls ~= "rareelite" then return end
+    if not UnitCanAttack("player", unit) or UnitIsDead(unit) then return end
+    if seenRare[name] and GetTime() - seenRare[name] < 300 then return end
+    seenRare[name] = GetTime()
+    PlaySound(SOUNDKIT.RAID_WARNING)
+    local lv = UnitLevel(unit)
+    G:Print(("|cff33ff33%s is up!|r (%s%s)"):format(name, cls == "rareelite" and "rare elite" or "rare",
+        (lv and lv > 0) and (", level " .. lv) or ""))
+    UIErrorsFrame:AddMessage(name .. " is up!", 0.2, 1, 0.2)
+end
+
 local function check(unit)
-    if not (H.name and UnitExists(unit)) then return end
+    if not UnitExists(unit) then return end
     local name = UnitName(unit)
-    if issecretvalue and issecretvalue(name) then return end
-    if name ~= H.name then return end
+    if not name or (issecretvalue and issecretvalue(name)) then return end
+    if name ~= H.name then anyRare(unit, name); return end
     local dead = UnitIsDead(unit)
     H.seen, H.dead = GetTime(), dead
     if not H.alerted or GetTime() - H.alerted > 60 then

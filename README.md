@@ -25,6 +25,7 @@ The search box sits in **VoidMap's** toolbar on the world map. Without the map o
 For a rare that doesn't always spawn, or any NPC you're heading to:
 - A **Target** button in the box (and a key in Key Bindings) that tries to target it. Each press is one try
 - VoidGPS watches nameplates, your target and your mouseover, and tells you with a sound the moment it shows up: **"is up!"** or **"is dead"**
+- **Any rare, not just your target:** the moment any rare shows on a nameplate, your target or your mouseover, you get a sound and "Rathorian is up!", then quiet for 5 minutes for that rare. The **Rares** button next to the search box turns it off or on (or `/gps rares`)
 
 ### Walking routes come from VoidMap
 **VoidMap** records the paths you walk. The more you play, the more routes follow real paths instead of straight lines. Without VoidMap every leg is a straight line.

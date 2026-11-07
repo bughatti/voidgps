@@ -1,5 +1,11 @@
 # VoidGPS Changelog
 
+## 0.1.1
+
+- **Every rare, not just the one you're heading to:** the moment any rare shows on a nameplate, your target or your mouseover you get a sound and "Rathorian is up! (rare, level 15)", then quiet for 5 minutes for that rare. A **Rares** button next to the search box (on the world map and in the search window) turns it off or on; so does `/gps rares`.
+- **Fixed:** picking a place from your recent list again added another "recent" to its label each time.
+- **Fixed:** route planning no longer errors if the game hides your speed during a fight.
+
 ## 0.1.0
 
 First version.

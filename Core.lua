@@ -30,6 +30,13 @@ function G:FactionLetter()
     return f == "Horde" and "H" or (f == "Alliance" and "A" or "")
 end
 
+-- The any-rare alert (Hunt.lua): the "Rares" button next to the search box and /gps rares.
+function G:SetRareAlerts(on)
+    VoidGPSDB.rareAlerts = on and true or false
+    G:Print("Rare alerts " .. (on and "on" or "off") .. ".")
+    if ns.Search and ns.Search.PaintRares then ns.Search:PaintRares() end
+end
+
 local readyFns = {}
 function G:OnReady(fn) readyFns[#readyFns + 1] = fn end
 
@@ -54,6 +61,8 @@ SlashCmdList.VOIDGPS = function(msg)
     msg = (msg or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "stop" then
         if ns.Guide then ns.Guide:Stop("stopped") end
+    elseif msg == "rares" then
+        G:SetRareAlerts(VoidGPSDB.rareAlerts == false)
     elseif msg ~= "" and ns.Search then
         ns.Search:Open(msg)
     elseif ns.Search then

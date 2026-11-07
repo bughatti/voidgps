@@ -104,7 +104,11 @@ function S:Find(q)
     local out = {}
     if q == "" then
         for _, r in ipairs(VoidGPSDB.recent or {}) do
-            out[#out + 1] = { name = r.name, sub = (r.sub and r.sub ~= "" and (r.sub .. " · ") or "") .. "recent", map = r.map, x = r.x, y = r.y, npc = r.npc }
+            -- the shown " · recent" must not be saved back when you pick it again (it piled
+            -- up: "Rare · recent · recent · recent"); strip it from older saves too
+            local base = (r.sub or ""):gsub("%s*·%s*recent", ""):gsub("^recent$", "")
+            out[#out + 1] = { name = r.name, sub = (base ~= "" and (base .. " · ") or "") .. "recent", baseSub = base,
+                map = r.map, x = r.x, y = r.y, npc = r.npc }
         end
         return out
     end
@@ -195,7 +199,7 @@ local function go(r)
     if r.unit then
         ns.Guide:Start({ name = r.name, unit = r.unit, guid = r.guid, sub = "group member" })
     else
-        ns.Guide:Start({ name = r.name, sub = r.sub, map = r.map, x = r.x, y = r.y, npc = r.npc })
+        ns.Guide:Start({ name = r.name, sub = r.baseSub or r.sub, map = r.map, x = r.x, y = r.y, npc = r.npc })
         if WorldMapFrame and WorldMapFrame:IsShown() and r.map then WorldMapFrame:SetMapID(r.map) end
     end
 end
@@ -225,6 +229,38 @@ local function makeWidget(parent, width, listParent)
     hint:SetTextColor(0.5, 0.5, 0.56)
     hint:SetText("GPS: where to? (name, service, zone)")
     w.eb = eb
+
+    -- "Rares" toggle: the any-rare alert (Hunt.lua) on or off. The host anchors it.
+    local rb = CreateFrame("Button", nil, parent)
+    rb:SetSize(46, 20)
+    local rbg = rb:CreateTexture(nil, "BACKGROUND")
+    rbg:SetAllPoints()
+    local rt = rb:CreateFontString(nil, "OVERLAY")
+    rt:SetFont(FONT, 10, "")
+    rt:SetPoint("CENTER")
+    rt:SetText("Rares")
+    w.rb = rb
+    function w:PaintRares(hover)
+        local on = not (VoidGPSDB and VoidGPSDB.rareAlerts == false)
+        local k = hover and 0.5 or 0.35
+        if on then rbg:SetColorTexture(A[1] * k, A[2] * k, A[3] * k, 1)
+        else rbg:SetColorTexture(hover and 0.16 or 0.10, hover and 0.18 or 0.12, hover and 0.22 or 0.15, 1) end
+        rt:SetTextColor(on and 1 or 0.55, on and 1 or 0.55, on and 1 or 0.6)
+    end
+    local function rareTip(self)
+        local on = not (VoidGPSDB and VoidGPSDB.rareAlerts == false)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText("Rare alerts: " .. (on and "|cff33ff33on|r" or "|cffff5050off|r"), 1, 1, 1)
+        GameTooltip:AddLine("A sound and \"<name> is up!\" when any rare shows on a nameplate, your target or your mouseover. Click to turn it " .. (on and "off." or "on."), 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end
+    rb:SetScript("OnEnter", function(self) w:PaintRares(true); rareTip(self) end)
+    rb:SetScript("OnLeave", function() w:PaintRares(false); GameTooltip:Hide() end)
+    rb:SetScript("OnClick", function(self)
+        G:SetRareAlerts(VoidGPSDB.rareAlerts == false)
+        if GameTooltip:IsOwned(self) then rareTip(self) end
+    end)
+    w:PaintRares(false)
 
     local list = CreateFrame("Frame", nil, listParent or parent)
     list:SetPoint("TOPLEFT", eb, "BOTTOMLEFT", 0, -2)
@@ -329,7 +365,7 @@ local inMap, window
 
 local function buildWindow()
     window = CreateFrame("Frame", "VoidGPSSearchWindow", UIParent)
-    window:SetSize(340, 34)
+    window:SetSize(392, 34)
     window:SetPoint("TOP", UIParent, "TOP", 0, -120)
     window:SetFrameStrata("DIALOG")
     window:EnableMouse(true)
@@ -346,6 +382,7 @@ local function buildWindow()
     t:SetText("|cff00c7ffVoidGPS|r")
     local w = makeWidget(window, 260, window)
     w.eb:SetPoint("RIGHT", window, "RIGHT", -7, 0)
+    w.rb:SetPoint("RIGHT", w.eb, "LEFT", -4, 0)
     w.onChosen = function() window:Hide() end
     w.onEscape = function() window:Hide() end
     window.w = w
@@ -368,8 +405,14 @@ local function hostInVoidMap()
     local M = VoidMap
     if inMap or not (M and M.toolbar) then return end
     inMap = makeWidget(M.toolbar, 230, WorldMapFrame)
-    inMap.eb:SetPoint("RIGHT", M.toolbarRight or M.toolbar, "LEFT", -10, 0)
+    inMap.rb:SetPoint("RIGHT", M.toolbarRight or M.toolbar, "LEFT", -10, 0)
+    inMap.eb:SetPoint("RIGHT", inMap.rb, "LEFT", -4, 0)
     inMap.eb:SetFrameLevel(M.toolbar:GetFrameLevel() + 6)
+    inMap.rb:SetFrameLevel(M.toolbar:GetFrameLevel() + 6)
+end
+
+function S:PaintRares()
+    for _, w in ipairs(widgets) do w:PaintRares(false) end
 end
 
 G:OnReady(function()

@@ -22,7 +22,8 @@ local LEAVE_CELLS = 20      -- and near the target
 
 local function runSpeed()
     local _, run = GetUnitSpeed("player")
-    return math.max(7, run or 7)
+    if not run or (issecretvalue and issecretvalue(run)) then return 7 end   -- secret in combat at times
+    return math.max(7, run)
 end
 
 ----------------------------------------------------------------------
