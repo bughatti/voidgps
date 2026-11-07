@@ -10,6 +10,7 @@
 - **A zone or city**: "Desolace", "Orgrimmar"
 - **Coordinates**: "26 69" on the map you're on, or "Desolace 26 69"
 - **A party member**: a live route to them. **A friend**: their zone
+- **A herb or ore**: "briarthorn", "tin vein", "herb", "ore": a route to the nearest spot it can spawn
 - Your **recent places** when the box is empty. Up / Down / Enter / Esc work
 
 The search box sits in **VoidMap's** toolbar on the world map. Without the map open: the **Void hub icon** by the minimap, a key (Key Bindings > AddOns > VoidGPS), or `/gps`.
@@ -42,7 +43,7 @@ For a rare that doesn't always spawn, or any NPC you're heading to:
 
 ## Credits
 
-The WoW Forever NPC, rare, object and zeppelin data comes from **NorgannonDB** (GPL-3.0), built on **QuestieDB** and pfQuest. Thank you to both projects.
+The WoW Forever NPC, rare, object, herb, ore and zeppelin data comes from **NorgannonDB** (GPL-3.0), built on **QuestieDB** and pfQuest. Thank you to both projects.
 
 ---
 

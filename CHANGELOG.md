@@ -1,5 +1,10 @@
 # VoidGPS Changelog
 
+## 0.2.0
+
+- **Herbs and ore:** type "briarthorn", "tin vein" or just "herb" / "ore" and VoidGPS routes you to the nearest spot it can spawn: over 25,000 spots for every Classic herb and ore (and Forever's new ones). One arrow target, no dots on the map. Picked already? Choose it again for the next nearest.
+- **VoidProf** uses these spots for its Herbalism and Mining leveling plan: the best zones for each step and a "Nearest spot" button.
+
 ## 0.1.1
 
 - **Every rare, not just the one you're heading to:** the moment any rare shows on a nameplate, your target or your mouseover you get a sound and "Rathorian is up! (rare, level 15)", then quiet for 5 minutes for that rare. A **Rares** button next to the search box (on the world map and in the search window) turns it off or on; so does `/gps rares`.

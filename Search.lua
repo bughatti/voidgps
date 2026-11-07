@@ -35,6 +35,8 @@ local SYN = {
     anvil = { "anvil" }, forge = { "forge" },
     food = { "food & drink", "innkeeper" }, drink = { "food & drink", "innkeeper" },
     rare = { "rare" },
+    herb = { "herb" }, herbs = { "herb" }, herbalism = { "herb" },
+    ore = { "ore" }, mining = { "ore" }, vein = { "ore" },
 }
 
 ----------------------------------------------------------------------
@@ -59,6 +61,12 @@ local function buildIndex()
     for _, o in ipairs(ns.OBJECTS or {}) do
         index[#index + 1] = { kind = "obj", name = o[1], sub = "", map = o[2], x = o[3] / 10000, y = o[4] / 10000,
             lname = o[1]:lower(), lsub = o[1]:lower() }
+    end
+    -- herbs and ore (Nodes.lua): one entry per name, routed to the nearest spot
+    for name, d in pairs(ns.NODES or {}) do
+        local k = ns.Nodes and ns.Nodes.KIND[d[1]] or "Node"
+        index[#index + 1] = { kind = "node", name = name, sub = k .. " · nearest spot",
+            lname = name:lower(), lsub = k:lower() }
     end
     local seen = {}
     for _, root in ipairs({ 946, 947 }) do
@@ -108,7 +116,7 @@ function S:Find(q)
             -- up: "Rare · recent · recent · recent"); strip it from older saves too
             local base = (r.sub or ""):gsub("%s*·%s*recent", ""):gsub("^recent$", "")
             out[#out + 1] = { name = r.name, sub = (base ~= "" and (base .. " · ") or "") .. "recent", baseSub = base,
-                map = r.map, x = r.x, y = r.y, npc = r.npc }
+                map = r.map, x = r.x, y = r.y, npc = r.npc, kind = r.node and "node" or nil }
         end
         return out
     end
@@ -167,8 +175,13 @@ function S:Find(q)
         if hits[i].s < cutoff or i > 3000 then break end
         keep = i
         local e = hits[i].e
-        local c, x, y = Geo.ToWorld(e.map, e.x, e.y)
-        hits[i].d = (c and c == cont) and Geo.Dist(px, py, x, y) or (c and 1e7 or 2e7)
+        if e.kind == "node" then
+            local _, _, _, _, yd = ns.Nodes:Nearest({ e.name })
+            hits[i].d = yd or 1e7
+        else
+            local c, x, y = Geo.ToWorld(e.map, e.x, e.y)
+            hits[i].d = (c and c == cont) and Geo.Dist(px, py, x, y) or (c and 1e7 or 2e7)
+        end
     end
     for i = #hits, keep + 1, -1 do hits[i] = nil end
     table.sort(hits, function(a, b)
@@ -179,7 +192,7 @@ function S:Find(q)
     for _, h in ipairs(hits) do
         if #out >= MAX then break end
         local e = h.e
-        local k = e.name .. "|" .. e.map .. "|" .. math.floor(e.x * 100) .. "|" .. math.floor(e.y * 100)
+        local k = e.name .. "|" .. (e.map or 0) .. "|" .. math.floor((e.x or 0) * 100) .. "|" .. math.floor((e.y or 0) * 100)
         if not seen[k] then
             seen[k] = true
             out[#out + 1] = { name = e.name, sub = e.sub, map = e.map, x = e.x, y = e.y, kind = e.kind, npc = e.npc,
@@ -196,6 +209,10 @@ local widgets = {}
 
 local function go(r)
     if not r then return end
+    if r.kind == "node" and ns.Nodes then
+        if not ns.Nodes:Go({ r.name }) then G:Print("No spots known for " .. r.name .. ".") end
+        return
+    end
     if r.unit then
         ns.Guide:Start({ name = r.name, unit = r.unit, guid = r.guid, sub = "group member" })
     else

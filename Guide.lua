@@ -332,8 +332,11 @@ function Guide:Start(target)
     end
     -- remember it for the search box
     local recent = VoidGPSDB.recent
-    for i = #recent, 1, -1 do if recent[i].name == target.name and recent[i].map == target.map then table.remove(recent, i) end end
-    if not target.unit then table.insert(recent, 1, { name = target.name, sub = target.sub, map = target.map, x = target.x, y = target.y, npc = target.npc }) end
+    -- (a herb or ore is one entry by name: picked again, it goes to the then-nearest spot)
+    for i = #recent, 1, -1 do
+        if recent[i].name == target.name and (recent[i].map == target.map or (target.node and recent[i].node)) then table.remove(recent, i) end
+    end
+    if not target.unit then table.insert(recent, 1, { name = target.name, sub = target.sub, map = target.map, x = target.x, y = target.y, npc = target.npc, node = target.node }) end
     while #recent > 8 do table.remove(recent) end
     if not box then buildBox() end
     if ns.Hunt then ns.Hunt:Set(target.npc and target.name or nil) end   -- an NPC: Target button + "is it up?"
