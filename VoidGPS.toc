@@ -1,0 +1,19 @@
+## Interface: 120105, 16001
+## Title: |cff00c7ffVoidGPS|r
+## Notes: Type a place, an NPC, a service or a party member: a route that follows walked paths, flight paths and zeppelins, through zones
+## Author: Vede
+## Version: 0.1.0
+## SavedVariables: VoidGPSDB
+## SavedVariablesPerCharacter: VoidHubCharDB
+## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
+## OptionalDeps: VoidMap
+
+Core.lua
+Geo.lua
+Places.lua
+Router.lua
+Guide.lua
+Hunt.lua
+Draw.lua
+Search.lua
+VoidHubBundle.lua

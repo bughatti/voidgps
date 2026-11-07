@@ -1,0 +1,10 @@
+<Bindings>
+	<Binding name="VOIDGPS_SEARCH" header="VOIDGPS">
+		VoidGPS_BindSearch()
+	</Binding>
+	<Binding name="VOIDGPS_STOP">
+		VoidGPS_BindStop()
+	</Binding>
+	<Binding name="CLICK VoidGPSTargetButton:LeftButton">
+	</Binding>
+</Bindings>
