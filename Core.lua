@@ -63,6 +63,13 @@ SlashCmdList.VOIDGPS = function(msg)
         if ns.Guide then ns.Guide:Stop("stopped") end
     elseif msg == "rares" then
         G:SetRareAlerts(VoidGPSDB.rareAlerts == false)
+    elseif msg == "rarelog" then
+        if ns.RareAlert then ns.RareAlert:PrintLog(15) end
+    elseif msg == "raretest" then
+        -- the popup for your target (or a made-up name), not logged
+        local n = UnitExists("target") and UnitName("target")
+        if issecretvalue and n and issecretvalue(n) then n = nil end
+        if ns.RareAlert then ns.RareAlert:Show(n or "Test Rare", "rare", UnitLevel("target")) end
     elseif msg ~= "" and ns.Search then
         ns.Search:Open(msg)
     elseif ns.Search then

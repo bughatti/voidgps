@@ -1,5 +1,10 @@
 # VoidGPS Changelog
 
+## 0.3.5
+
+- **Rare alerts are now a popup you can't miss:** a box near the top of the screen with the rare's name, level and "RARE IS UP" (or rare elite), plus a **Target** button. It stays until the rare dies ("KILLED", then it goes away), you close it, or 5 minutes pass. The chat line, center text and sound are still there. A rare that shows up mid-fight gets its Target button when the fight ends (the game doesn't let addons change it in combat).
+- **Rare log:** every rare VoidGPS sees is noted (alert shown, alerts off, seen dead, killed), with time and place. `/gps rarelog` lists the latest; `/gps raretest` shows the popup for your target to try it.
+
 ## 0.3.4
 
 - **Quick switch for rare alerts:** left-click the Void hub button by your minimap and a Quick switches box opens next to the addon icons, with Rare alerts on/off (also `/vquick`).

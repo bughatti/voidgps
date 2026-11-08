@@ -61,11 +61,25 @@ end
 -- Any rare, not only the one you're heading to (the user, 2026-11-07, after Rathorian):
 -- a sound and "<name> is up!" the first time you see it, then quiet for 5 minutes.
 local seenRare = {}
+-- 2026-11-08: every rare seen goes in VoidGPSDB.rareLog, and an alert also opens the
+-- popup (RareAlert.lua), so a missed alert can be told from one that never fired.
+local function howSeen(unit)
+    return unit:match("^nameplate") and "nameplate" or unit
+end
+
 local function anyRare(unit, name)
-    if VoidGPSDB and VoidGPSDB.rareAlerts == false then return end
     local cls = UnitClassification(unit)
     if cls ~= "rare" and cls ~= "rareelite" then return end
-    if not UnitCanAttack("player", unit) or UnitIsDead(unit) then return end
+    if not UnitCanAttack("player", unit) then return end
+    local RA = ns.RareAlert
+    if UnitIsDead(unit) then
+        if RA then RA:Dead(name, cls, howSeen(unit)) end
+        return
+    end
+    if VoidGPSDB and VoidGPSDB.rareAlerts == false then
+        if RA then RA:Log(name, cls, howSeen(unit), "off") end
+        return
+    end
     if seenRare[name] and GetTime() - seenRare[name] < 300 then return end
     seenRare[name] = GetTime()
     PlaySound(SOUNDKIT.RAID_WARNING)
@@ -73,6 +87,10 @@ local function anyRare(unit, name)
     G:Print(("|cff33ff33%s is up!|r (%s%s)"):format(name, cls == "rareelite" and "rare elite" or "rare",
         (lv and lv > 0) and (", level " .. lv) or ""))
     UIErrorsFrame:AddMessage(name .. " is up!", 0.2, 1, 0.2)
+    if RA then
+        RA:Log(name, cls, howSeen(unit), "alert", lv)
+        RA:Show(name, cls, lv)
+    end
 end
 
 local function check(unit)
@@ -81,6 +99,7 @@ local function check(unit)
     if not name or (issecretvalue and issecretvalue(name)) then return end
     if name ~= H.name then anyRare(unit, name); return end
     local dead = UnitIsDead(unit)
+    if ns.RareAlert then ns.RareAlert:Log(name, UnitClassification(unit), howSeen(unit), dead and "hunt, dead" or "hunt") end
     H.seen, H.dead = GetTime(), dead
     if not H.alerted or GetTime() - H.alerted > 60 then
         H.alerted = GetTime()
