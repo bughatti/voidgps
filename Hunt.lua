@@ -18,7 +18,7 @@ local btn
 local pendingName        -- set when the name changed in combat
 
 local function apply(name)
-    if InCombatLockdown() then pendingName = name or false; return end
+    if InCombatLockdown() or not (btn and btn.ready) then pendingName = name or false; return end
     pendingName = nil
     btn:SetAttribute("macrotext", name and ("/targetexact " .. name) or "")
     btn:SetShown(name ~= nil and ns.Guide:Active() ~= nil)
@@ -47,7 +47,7 @@ end
 local wantBox
 function H:Anchor(box)
     wantBox = box
-    if InCombatLockdown() or not btn then return end
+    if InCombatLockdown() or not (btn and btn.ready) then return end
     local r, b = box:GetRight(), box:GetBottom()
     if not (r and b) then
         C_Timer.After(0.2, function() H:Anchor(box) end)
@@ -96,12 +96,19 @@ end
 
 G:OnReady(function()
     btn = CreateFrame("Button", "VoidGPSTargetButton", UIParent, "SecureActionButtonTemplate")
-    btn:SetSize(52, 18)
-    btn:SetFrameStrata("MEDIUM")   -- with the status box, under the world map
-    btn:SetFrameLevel(50)
-    btn:RegisterForClicks("AnyUp", "AnyDown")
-    btn:SetAttribute("type", "macro")
-    btn:SetAttribute("macrotext", "")
+    -- a secure button can't be set up under combat lockdown (a /reload mid-fight): then
+    -- this waits for the end of combat (2026-11-07)
+    local function secureSetup()
+        btn:SetSize(52, 18)
+        btn:SetFrameStrata("MEDIUM")   -- with the status box, under the world map
+        btn:SetFrameLevel(50)
+        btn:RegisterForClicks("AnyUp", "AnyDown")
+        btn:SetAttribute("type", "macro")
+        btn:SetAttribute("macrotext", "")
+        btn:Hide()
+        btn.ready = true
+    end
+    if InCombatLockdown() then H.setupLater = secureSetup else secureSetup() end
     local bg = btn:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetColorTexture(0.06, 0.25, 0.32, 1)
@@ -117,7 +124,6 @@ G:OnReady(function()
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() bg:SetColorTexture(0.06, 0.25, 0.32, 1); GameTooltip:Hide() end)
-    btn:Hide()
 
     local ev = CreateFrame("Frame")
     ev:RegisterEvent("NAME_PLATE_UNIT_ADDED")
@@ -129,6 +135,7 @@ G:OnReady(function()
         elseif event == "PLAYER_TARGET_CHANGED" then check("target")
         elseif event == "UPDATE_MOUSEOVER_UNIT" then check("mouseover")
         elseif event == "PLAYER_REGEN_ENABLED" then
+            if H.setupLater then local f = H.setupLater; H.setupLater = nil; f() end   -- loaded in combat
             if pendingName ~= nil then apply(pendingName or nil) end
             if wantBox then H:Anchor(wantBox) end
         end

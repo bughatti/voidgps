@@ -1,5 +1,10 @@
 # VoidGPS Changelog
 
+## 0.3.1
+
+- **Everything vendors sell**, not just recipes: 2,067 items (recipes, pets, gear, reagents, consumables) from 1,053 vendors who are there all year, with limited stock flagged. VoidAH's Deals uses it for its Vendor -> AH list.
+- **Fixed: the Target button after a /reload mid-fight.** It's now set up once combat ends instead of being blocked.
+
 ## 0.3.0
 
 - **Which vendor sells which recipe** (677 recipes, 1,439 vendor offers, holiday vendors left out, with skill needed, price and limited stock), for VoidProf's "recipes from vendors" lists and zone popups. A click there starts a VoidGPS route to the nearest vendor.

@@ -1,53 +1,59 @@
 ----------------------------------------------------------------------
--- Recipes.lua — which vendor sells which recipe (Places.lua: NorgannonDB's vendor
--- lists, item data from Blizzard's Forever API). For other addons:
+-- Recipes.lua — what vendors sell and where (Places.lua: NorgannonDB's vendor
+-- lists, item data from Blizzard's Forever API; holiday vendors left out).
 --
---   VoidGPS.Recipes:All()        -> { { item, name, line, skill, buy, limited, vendors }, ... }
---                                   vendors your faction can use, nearest first
---   VoidGPS.Recipes:Get(item)    -> that entry, or nil
---   VoidGPS.Recipes:Go(item)     -> route to the nearest vendor of it: ok, vendor, map, yards
+--   VoidGPS.Goods:All(kind)      -> { entry, ... } vendors your faction can use, nearest first;
+--                                   kind nil = everything, or one of:
+--                                   r recipe, p pet, g gear, t trade goods / reagent, c consumable, o other
+--   VoidGPS.Goods:Get(item)      -> that entry, or nil
+--   VoidGPS.Goods:Go(item)       -> route to the nearest vendor of it: ok, vendor, map, yards
+--   VoidGPS.Goods:GoVendor(v, label)
+--   VoidGPS.Recipes              -> the same for recipes only (VoidProf 1.2.0 uses it)
 --
--- line = the profession's skill line (171 Alchemy, 164 Blacksmithing, 185 Cooking,
--- 333 Enchanting, 202 Engineering, 129 First Aid, 356 Fishing, 165 Leatherworking,
--- 197 Tailoring); skill = skill needed to learn it; buy = vendor price in copper;
--- limited = at least one vendor has it in limited stock (it comes back after a while).
+-- entry = { item, name, kind, line, skill, buy, qty, limited, vendors = { { name, map, x, y,
+-- limited, yards }, ... } }. line = the profession's skill line (171 Alchemy, 164
+-- Blacksmithing, 185 Cooking, 333 Enchanting, 202 Engineering, 129 First Aid, 356 Fishing,
+-- 165 Leatherworking, 197 Tailoring); skill = skill needed to learn it; buy = vendor price
+-- in copper for qty of it; limited = some vendor has it in limited stock.
 ----------------------------------------------------------------------
 local _, ns = ...
 local G, Geo = ns.G, ns.Geo
-local R = {}
-ns.Recipes = R
-G.Recipes = R
 
 local byItem   -- item -> entry (built once, for your faction)
 
 local function build()
     byItem = {}
     local fac = G:FactionLetter()
-    for _, v in ipairs(ns.RECIPE_VENDORS or {}) do
-        local item, vendor, map, x, y, f, lim = v[1], v[2], v[3], v[4], v[5], v[6], v[7]
-        local info = ns.RECIPES and ns.RECIPES[item]
-        if info and (fac == "" or f:find(fac, 1, true)) then
-            local e = byItem[item]
-            if not e then
-                e = { item = item, name = info[1], line = info[2], skill = info[3], buy = info[4], limited = false, vendors = {} }
-                byItem[item] = e
+    local goods = ns.GOODS or {}
+    for idx, list in pairs(ns.SELLS or {}) do
+        local npc = ns.NPCS and ns.NPCS[idx]
+        if npc and (fac == "" or npc[6]:find(fac, 1, true)) then
+            local vx, vy = npc[4] / 10000, npc[5] / 10000
+            local cont, wx, wy = Geo.ToWorld(npc[3], vx, vy)   -- once per vendor
+            for tok in list:gmatch("[^,]+") do
+                local item = tonumber(tok:match("^%d+"))
+                local lim = tok:sub(-1) == "*"
+                local info = item and goods[item]
+                if info then
+                    local e = byItem[item]
+                    if not e then
+                        e = { item = item, name = info[1], kind = info[2], line = info[3], skill = info[4],
+                              buy = info[5], qty = info[6] or 1, limited = false, vendors = {} }
+                        byItem[item] = e
+                    end
+                    e.vendors[#e.vendors + 1] = { name = npc[1], map = npc[3], x = vx, y = vy, limited = lim,
+                        cont = cont, wx = wx, wy = wy }
+                    if lim then e.limited = true end
+                end
             end
-            e.vendors[#e.vendors + 1] = { name = vendor, map = map, x = x / 10000, y = y / 10000, limited = lim == 1 }
-            if lim == 1 then e.limited = true end
         end
     end
 end
 
--- yards from you to a vendor (nil when on another continent)
-local function yards(v, cont, px, py)
-    if not cont then return nil end
-    local c, wx, wy = Geo.ToWorld(v.map, v.x, v.y)
-    if c ~= cont then return nil end
-    return Geo.Dist(px, py, wx, wy)
-end
-
 local function sortVendors(e, cont, px, py)
-    for _, v in ipairs(e.vendors) do v.yards = yards(v, cont, px, py) end
+    for _, v in ipairs(e.vendors) do
+        v.yards = (cont and v.cont == cont) and Geo.Dist(px, py, v.wx, v.wy) or nil
+    end
     table.sort(e.vendors, function(a, b)
         if (a.yards ~= nil) ~= (b.yards ~= nil) then return a.yards ~= nil end
         if a.yards and b.yards and a.yards ~= b.yards then return a.yards < b.yards end
@@ -55,40 +61,47 @@ local function sortVendors(e, cont, px, py)
     end)
 end
 
-function R:All()
-    if not byItem then build() end
-    local cont, px, py = Geo.Player()
-    local out = {}
-    for _, e in pairs(byItem) do
-        sortVendors(e, cont, px, py)
-        out[#out + 1] = e
+local function make(onlyKind)
+    local R = {}
+    function R:All(kind)
+        kind = onlyKind or kind
+        if not byItem then build() end
+        local cont, px, py = Geo.Player()
+        local out = {}
+        for _, e in pairs(byItem) do
+            if not kind or e.kind == kind then
+                sortVendors(e, cont, px, py)
+                out[#out + 1] = e
+            end
+        end
+        table.sort(out, function(a, b) return a.name < b.name end)
+        return out
     end
-    table.sort(out, function(a, b) return a.name < b.name end)
-    return out
-end
-
-function R:Get(item)
-    if not byItem then build() end
-    local e = byItem[item]
-    if e then
+    function R:Get(item)
+        if not byItem then build() end
+        local e = byItem[item]
+        if not e or (onlyKind and e.kind ~= onlyKind) then return nil end
         local cont, px, py = Geo.Player()
         sortVendors(e, cont, px, py)
+        return e
     end
-    return e
+    -- route to one given vendor (an entry of e.vendors)
+    function R:GoVendor(v, label)
+        if not (v and v.map) then return false end
+        ns.Guide:Start({ name = v.name, sub = label and ("Sells " .. label) or "Vendor", map = v.map, x = v.x, y = v.y })
+        return true
+    end
+    function R:Go(item)
+        local e = self:Get(item)
+        local v = e and e.vendors[1]
+        if not v then return false end
+        self:GoVendor(v, e.name)
+        return true, v.name, v.map, v.yards
+    end
+    return R
 end
 
--- route to one given vendor (an entry of e.vendors): ok
-function R:GoVendor(v, recipeName)
-    if not (v and v.map) then return false end
-    ns.Guide:Start({ name = v.name, sub = recipeName and ("Sells " .. recipeName) or "Vendor", map = v.map, x = v.x, y = v.y })
-    return true
-end
-
-function R:Go(item)
-    local e = self:Get(item)
-    local v = e and e.vendors[1]
-    if not v then return false end
-    -- (not npc = true: that adds the Target / "is it up?" button, meant for rares)
-    ns.Guide:Start({ name = v.name, sub = "Sells " .. e.name, map = v.map, x = v.x, y = v.y })
-    return true, v.name, v.map, v.yards
-end
+ns.Goods = make(nil)
+G.Goods = ns.Goods
+ns.Recipes = make("r")
+G.Recipes = ns.Recipes
