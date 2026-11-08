@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.3.3
+
+- **The route shows in VoidGather's gathering HUD.** The HUD fades the minimap away, and the route's dots faded with it; they now keep their own opacity.
+
 ## 0.3.2
 
 - **Knows what a vendor wants besides gold.** The 14 Azeroth Commerce Authority supply-post vendors (the Barrens depot and Three Corners in Redridge) sell their recipes for Merchant's Favor and reputation. Every vendor you open is read for its real costs (gold, Merchant's Favor, other currencies) and the reputation each item needs, and remembered.

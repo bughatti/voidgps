@@ -205,6 +205,9 @@ G:OnReady(function()
     holder:SetAllPoints()
     holder:SetFrameLevel(Minimap:GetFrameLevel() + 6)
     holder.voidKeep = true          -- VoidGather's HUD keeps it on the minimap
+    -- ...and fades the minimap itself (default: fully), which took the route with it
+    -- (the user, 2026-11-07): the route keeps its own opacity, like VoidGather's pins
+    holder:SetIgnoreParentAlpha(true)
     local acc = 0
     holder:SetScript("OnUpdate", function(_, dt)
         acc = acc + dt
