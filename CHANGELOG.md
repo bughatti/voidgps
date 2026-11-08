@@ -1,5 +1,10 @@
 # VoidGPS Changelog
 
+## 0.3.2
+
+- **Knows what a vendor wants besides gold.** The 14 Azeroth Commerce Authority supply-post vendors (the Barrens depot and Three Corners in Redridge) sell their recipes for Merchant's Favor and reputation. Every vendor you open is read for its real costs (gold, Merchant's Favor, other currencies) and the reputation each item needs, and remembered.
+- **Routes to a recipe go to a vendor that takes gold.** A Merchant's Favor vendor is only used when nobody sells it for gold.
+
 ## 0.3.1
 
 - **Everything vendors sell**, not just recipes: 2,067 items (recipes, pets, gear, reagents, consumables) from 1,053 vendors who are there all year, with limited stock flagged. VoidAH's Deals uses it for its Vendor -> AH list.

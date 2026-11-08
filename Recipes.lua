@@ -10,8 +10,10 @@
 --   VoidGPS.Goods:GoVendor(v, label)
 --   VoidGPS.Recipes              -> the same for recipes only (VoidProf 1.2.0 uses it)
 --
--- entry = { item, name, kind, line, skill, buy, qty, limited, vendors = { { name, map, x, y,
--- limited, yards }, ... } }. line = the profession's skill line (171 Alchemy, 164
+-- entry = { item, name, kind, line, skill, buy, qty, limited, gold, vendors = { { name, map, x, y,
+-- limited, yards, cost, rep }, ... } }. cost = nil when it's bought with gold, else Costs:Offer's
+-- table (Merchant's Favor / another currency); rep = reputation the offer needs ("Friendly"),
+-- gold or not; gold = some vendor sells it for gold. line = the profession's skill line (171 Alchemy, 164
 -- Blacksmithing, 185 Cooking, 333 Enchanting, 202 Engineering, 129 First Aid, 356 Fishing,
 -- 165 Leatherworking, 197 Tailoring); skill = skill needed to learn it; buy = vendor price
 -- in copper for qty of it; limited = some vendor has it in limited stock.
@@ -41,14 +43,22 @@ local function build()
                               buy = info[5], qty = info[6] or 1, limited = false, vendors = {} }
                         byItem[item] = e
                     end
+                    -- what this vendor wants for it besides gold (Costs.lua): Merchant's Favor + reputation, or a currency
+                    -- v.cost only when it's paid with something else; v.rep = reputation it needs either way
+                    local c = ns.Costs and ns.Costs:Offer(npc[1], npc[3], item, info[2])
+                    local cost = c and c.pay and c or nil
                     e.vendors[#e.vendors + 1] = { name = npc[1], map = npc[3], x = vx, y = vy, limited = lim,
-                        cont = cont, wx = wx, wy = wy }
+                        cont = cont, wx = wx, wy = wy, cost = cost, rep = c and c.rep }
                     if lim then e.limited = true end
+                    if not cost then e.gold = true end   -- at least one vendor sells it for gold
                 end
             end
         end
     end
 end
+
+-- a vendor scan learned a cost (Costs.lua): build again on next use
+function ns.GoodsDirty() byItem = nil end
 
 local function sortVendors(e, cont, px, py)
     for _, v in ipairs(e.vendors) do
@@ -91,9 +101,14 @@ local function make(onlyKind)
         ns.Guide:Start({ name = v.name, sub = label and ("Sells " .. label) or "Vendor", map = v.map, x = v.x, y = v.y })
         return true
     end
+    -- the nearest vendor that sells it for plain gold; only if none does, the nearest one at all
+    -- (a recipe route led to a Merchant's Favor vendor, 2026-11-07)
     function R:Go(item)
         local e = self:Get(item)
-        local v = e and e.vendors[1]
+        if not e then return false end
+        local v
+        for _, x in ipairs(e.vendors) do if not x.cost then v = x; break end end
+        v = v or e.vendors[1]
         if not v then return false end
         self:GoVendor(v, e.name)
         return true, v.name, v.map, v.yards
