@@ -88,3 +88,12 @@ VoidHubLaunchers.VoidGPS = {
         end
     end,
 }
+
+-- A switch in the Void hub's quick box (left-click the hub; VoidHubBundle.lua)
+VoidHubToggles = VoidHubToggles or {}
+table.insert(VoidHubToggles, {
+    id = "VoidGPS.rares", group = "GPS", label = "Rare alerts",
+    tip = "A sound and a Target button when a rare is near (the Rares button by VoidGPS's search box).",
+    get = function() return VoidGPSDB and VoidGPSDB.rareAlerts ~= false end,
+    set = function(on) G:SetRareAlerts(on) end,
+})

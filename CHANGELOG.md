@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.3.4
+
+- **Quick switch for rare alerts:** left-click the Void hub button by your minimap and a Quick switches box opens next to the addon icons, with Rare alerts on/off (also `/vquick`).
+
 ## 0.3.3
 
 - **The route shows in VoidGather's gathering HUD.** The HUD fades the minimap away, and the route's dots faded with it; they now keep their own opacity.
