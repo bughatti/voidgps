@@ -1,5 +1,7 @@
 # VoidGPS
 
+**Works on:** WoW Forever · WoW Midnight (search for zones, coordinates and party members)
+
 **Type where you want to go. VoidGPS draws the way: along paths people actually walk, by flight path and zeppelin, through zones.**
 
 ---
@@ -35,7 +37,8 @@ For a rare that doesn't always spawn, or any NPC you're heading to:
 
 ## Compatibility
 
-- **WoW Forever** (all the NPCs, services, rares and zeppelins) and **WoW 12.1.5** (zones, coordinates, party members)
+- **WoW Forever**: everything (all the NPCs, services, rares and zeppelins)
+- **WoW Midnight** 12.1.5 (Season 2): search for zones, coordinates and party members
 - Works best with **VoidMap**. No other addon needed
 - English game client
 
