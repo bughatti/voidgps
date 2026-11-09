@@ -21,6 +21,7 @@ The search box sits in **VoidMap's** toolbar on the world map. Without the map o
 - **A line on the world map and the minimap**: cyan along walked paths, orange dashed where no one has walked yet (a straight line), white dashed for a flight, purple for a boat or zeppelin
 - **Blizzard's own arrow** points at the next turn and moves on as you reach it
 - **Flight paths you know** are used when they're quicker. **Zeppelins** are built in; **boats** are learned the first time you ride one
+- **Routes for your quests** (with **VoidQuest**): hover a quest in another zone for the steps to get there, shift-click it to be guided
 - Off the route? It plans a new one. Another continent? It plans the rest when you get there
 - A small box shows where you're going, the next step and how far. **Stop** ends it
 

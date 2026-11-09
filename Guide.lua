@@ -34,7 +34,8 @@ local function stepsOf(route)
             steps[#steps + 1] = { kind = "flyFrom", cont = leg.cont, x = leg.from.x, y = leg.from.y, to = leg.to }
             steps[#steps + 1] = { kind = "flyTo", cont = leg.cont, x = leg.to.x, y = leg.to.y, to = leg.to }
         elseif leg.kind == "ride" then
-            steps[#steps + 1] = { kind = "board", cont = leg.from.c, x = leg.from.x, y = leg.from.y, name = leg.name, at = leg.at }
+            steps[#steps + 1] = { kind = "board", cont = leg.from.c, x = leg.from.x, y = leg.from.y, name = leg.name, at = leg.at,
+                dest = leg.dest, near = leg.near }
         end
     end
     return steps
@@ -150,6 +151,10 @@ local function instruction(step, d)
     elseif step.kind == "flyTo" then
         return ("Flying to %s"):format(step.to.name or "?")
     elseif step.kind == "board" then
+        if step.dest then   -- "the zeppelin outside Orgrimmar to Grom'gol (zeppelin master: ...)"
+            return ("Take the |cffffffffzeppelin%s to %s|r%s"):format(step.near and (" outside " .. step.near) or "", step.dest,
+                step.at and (" (zeppelin master: " .. step.at .. ")") or "")
+        end
         return ("Take the |cffffffff%s|r%s"):format(step.name or "boat", step.at and (" (" .. step.at .. ")") or "")
     end
     return ""
@@ -360,6 +365,102 @@ function G:RouteTo(target)
     if type(target) ~= "table" or not (target.unit or (target.map and target.x and target.y)) then return false end
     Guide:Start(target)
     return true
+end
+
+-- For other Void addons (VoidQuest, the user 2026-11-09: "i have a quest to turn in near grom gol, yet i dont
+-- know how to get there, im in camp t"): the way to { map, x, y } (x, y 0-1) as one short line, without
+-- starting a route. -> short ("fly to Orgrimmar, then zeppelin outside Orgrimmar to Grom'gol, then walk 832 yd"), seconds,
+-- steps ({ "Fly to Orgrimmar (from Camp Taurajo)", "Take the zeppelin outside Orgrimmar to ...", "Walk 832 yd to ..." }) | nil, why. The same question asked again within 20 s, from about the same spot, gets the same answer
+-- (planning walks a big graph).
+local described = {}
+function G:DescribeRoute(target)
+    if type(target) ~= "table" or not (target.map and target.x and target.y) then return nil, "no place" end
+    local cont, x, y, map = Geo.Player()
+    if not cont then return nil, "can't see where you are" end
+    local to = targetPos(target)
+    if not to then return nil, "can't see where that is" end
+    local key = ("%d:%.3f:%.3f:%s"):format(target.map, target.x, target.y, tostring(target.name))   -- the name is in the last step (Sol)
+    local c = described[key]
+    if c and GetTime() - c.t < 20 and c.cont == cont and Geo.Dist(c.x, c.y, x, y) < 100 then return c.text, c.cost, c.steps end
+    local ok, route, why = pcall(ns.Router.Plan, ns.Router, { cont = cont, x = x, y = y, map = map }, to)
+    if not ok then return nil, "couldn't plan it" end
+    if not route then return nil, why end
+    -- Step by step, in words (the user, 2026-11-09: "help me understand better the instructions to get
+    -- there, cause its confusing"): flight points without their ", Zone" tail, where each zeppelin
+    -- leaves from and who its master is, and what the last walk is to. No arrow characters: the
+    -- game's font has none (they showed as boxes).
+    local function place(n) return n and (n:match("^([^,]+)") or n) or "?" end
+    local function zoneName(m) local i = m and C_Map.GetMapInfo(m); return i and i.name end
+    local legs, steps, short = route.legs, {}, {}
+    for i, leg in ipairs(legs) do
+        local nextLeg = legs[i + 1]
+        if leg.kind == "walk" then
+            local d = 0
+            for k = 2, #leg.pts do d = d + Geo.Dist(leg.pts[k - 1][1], leg.pts[k - 1][2], leg.pts[k][1], leg.pts[k][2]) end
+            local yd = Geo.Yards(d)
+            if not nextLeg then
+                if d > 30 or #steps == 0 then
+                    steps[#steps + 1] = ("Walk %s yd to %s"):format(yd, target.name or "the spot")
+                    short[#short + 1] = ("walk %s yd"):format(yd)
+                end
+            elseif d > 60 and nextLeg.kind == "fly" then
+                steps[#steps + 1] = ("Walk to the %s flight master (%s yd)"):format(place(nextLeg.from.name), yd)
+            elseif d > 60 and nextLeg.kind == "ride" then
+                -- "outside Orgrimmar": the city the tower serves, else its zone
+                local where = nextLeg.near and (" outside " .. nextLeg.near)
+                    or (zoneName(nextLeg.fromMap) and (" in " .. zoneName(nextLeg.fromMap))) or ""
+                steps[#steps + 1] = ("Walk to the %s%s (%s yd)"):format(
+                    nextLeg.dest and "zeppelin tower" or "dock", where, yd)
+            end
+        elseif leg.kind == "fly" then
+            -- "fly to Orgrimmar" first, where from in brackets (the user: "from my current location fly to orgrimar")
+            steps[#steps + 1] = ("Fly to %s (from %s)"):format(place(leg.to.name), place(leg.from.name))
+            short[#short + 1] = "fly to " .. place(leg.to.name)
+        elseif leg.kind == "ride" then
+            if leg.dest then
+                local where = leg.near and (" outside " .. leg.near)
+                    or (zoneName(leg.fromMap) and (" in " .. zoneName(leg.fromMap))) or ""
+                steps[#steps + 1] = ("Take the zeppelin%s to %s%s"):format(where, leg.dest,
+                    leg.at and (" (zeppelin master: " .. leg.at .. ")") or "")
+                short[#short + 1] = ("zeppelin%s to %s"):format(where, leg.dest)
+            else
+                steps[#steps + 1] = "Take the " .. (leg.name or "boat")
+                short[#short + 1] = leg.name or "boat"
+            end
+        end
+    end
+    if #steps == 0 then
+        local yd = Geo.Yards(Geo.Dist(x, y, to.x, to.y))
+        steps[1] = ("Walk %s yd to %s"):format(yd, target.name or "the spot")
+        short[1] = ("walk %s yd"):format(yd)
+    end
+    local text = table.concat(short, ", then ")
+    described[key] = { t = GetTime(), cont = cont, x = x, y = y, text = text, cost = route.cost, steps = steps }
+    return text, route.cost, steps
+end
+
+-- For other Void addons: where an NPC stands, by name (your faction's first, never a hostile rare),
+-- from VoidGPS's places. -> { name, map, x, y } (x, y 0-1) or nil
+local npcIndex
+function G:FindNPC(name)
+    if type(name) ~= "string" or name == "" or not ns.NPCS then return nil end
+    if not npcIndex then
+        npcIndex = {}
+        for _, n in ipairs(ns.NPCS) do
+            local k = n[1]:lower()
+            npcIndex[k] = npcIndex[k] or {}
+            table.insert(npcIndex[k], n)
+        end
+    end
+    local list = npcIndex[name:lower()]
+    if not list then return nil end
+    local fac, best = G:FactionLetter(), nil
+    for _, n in ipairs(list) do
+        if n[6] ~= "R" and (fac == "" or n[6]:find(fac, 1, true)) then best = n break end
+    end
+    best = best or list[1]
+    if best[6] == "R" then return nil end
+    return { name = best[1], map = best[3], x = best[4] / 10000, y = best[5] / 10000 }
 end
 
 G:OnReady(function()

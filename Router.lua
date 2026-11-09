@@ -254,13 +254,17 @@ end
 local function links()
     local list = {}
     local fac = G:FactionLetter()
+    -- the city a tower serves = where its return trip goes ("the zeppelin outside Orgrimmar", the user
+    -- 2026-11-09): the row starting at this row's far end goes back to "Orgrimmar"
+    local backTo = {}
+    for _, z in ipairs(ns.ZEPPELINS or {}) do backTo[z[1]] = z[9] end
     for _, z in ipairs(ns.ZEPPELINS or {}) do
         if z[10]:find(fac, 1, true) then
             local c1, x1, y1 = Geo.ToWorld(z[2], z[3] / 10000, z[4] / 10000)
             local c2, x2, y2 = Geo.ToWorld(z[6], z[7] / 10000, z[8] / 10000)
             if c1 and c2 then
                 list[#list + 1] = { from = { c = c1, x = x1, y = y1 }, to = { c = c2, x = x2, y = y2 },
-                    name = "zeppelin to " .. z[9], at = z[1] }
+                    name = "zeppelin to " .. z[9], at = z[1], dest = z[9], fromMap = z[2], near = backTo[z[5]] }
             end
         end
     end
@@ -290,7 +294,7 @@ function R:Plan(from, to)
                     + Geo.Dist(l.to.x, l.to.y, to.x, to.y) / run
                 if c2 < cost * 0.8 then
                     local viaLegs = self:SameContinent(from.cont, contMap, from.x, from.y, l.from.x, l.from.y)
-                    viaLegs[#viaLegs + 1] = { kind = "ride", from = l.from, to = l.to, name = l.name, at = l.at }
+                    viaLegs[#viaLegs + 1] = { kind = "ride", from = l.from, to = l.to, name = l.name, at = l.at, dest = l.dest, fromMap = l.fromMap, near = l.near }
                     for _, x in ipairs((self:SameContinent(from.cont, contMap, l.to.x, l.to.y, to.x, to.y))) do viaLegs[#viaLegs + 1] = x end
                     legs, cost = viaLegs, c2
                 end
@@ -312,7 +316,7 @@ function R:Plan(from, to)
         return nil, "no known boat or zeppelin from here to there yet: take one once and VoidGPS remembers it"
     end
     local legs = self:SameContinent(from.cont, Geo.ContinentMap(from.map), from.x, from.y, best.from.x, best.from.y)
-    legs[#legs + 1] = { kind = "ride", from = best.from, to = best.to, name = best.name, at = best.at }
+    legs[#legs + 1] = { kind = "ride", from = best.from, to = best.to, name = best.name, at = best.at, dest = best.dest, fromMap = best.fromMap, near = best.near }
     -- the rest is planned again on arrival (a new continent, new flight paths)
     legs[#legs + 1] = { kind = "walk", cont = to.cont, known = false, pts = { { best.to.x, best.to.y }, { to.x, to.y } } }
     return { legs = legs, cost = bestCost }

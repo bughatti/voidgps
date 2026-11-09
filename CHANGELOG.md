@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.3.8
+
+- **Routes for your quests (with VoidQuest):** hover a quest in another zone and VoidQuest shows the way there that VoidGPS works out, step by step: "Fly to Orgrimmar (from Camp Taurajo)", "Take the zeppelin outside Orgrimmar to Grom'gol", "Walk 832 yd to Hemet Nesingwary". Shift-click the quest and VoidGPS guides you leg by leg.
+
 ## 0.3.7
 
 - **Fixed: box borders missing a side.** Depending on where a window sat on screen, its left, right or bottom line could vanish. Borders are now exactly one screen pixel and can't round away.
