@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.3.7
+
+- **Fixed: box borders missing a side.** Depending on where a window sat on screen, its left, right or bottom line could vanish. Borders are now exactly one screen pixel and can't round away.
+
 ## 0.3.6
 
 - **Other Void addons can route you now:** they can hand VoidGPS a place and you get the same route as from the search box, across zones and continents. The first to use it is VoidDungeon (coming soon), which routes you to the givers of dungeon quests you haven't picked up yet.
