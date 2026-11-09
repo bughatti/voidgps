@@ -354,6 +354,14 @@ end
 
 function Guide:Active() return active end
 
+-- For other Void addons (VoidDungeon's quest givers): route to { name, sub, map, x, y } (x, y 0-1)
+-- or { name, unit }. Same as picking it in the search box.
+function G:RouteTo(target)
+    if type(target) ~= "table" or not (target.unit or (target.map and target.x and target.y)) then return false end
+    Guide:Start(target)
+    return true
+end
+
 G:OnReady(function()
     C_Timer.NewTicker(0.25, tick)
     local ev = CreateFrame("Frame")

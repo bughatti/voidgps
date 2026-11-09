@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.3.6
+
+- **Other Void addons can route you now:** they can hand VoidGPS a place and you get the same route as from the search box, across zones and continents. The first to use it is VoidDungeon (coming soon), which routes you to the givers of dungeon quests you haven't picked up yet.
+
 ## 0.3.5
 
 - **Rare alerts are now a popup you can't miss:** a box near the top of the screen with the rare's name, level and "RARE IS UP" (or rare elite), plus a **Target** button. It stays until the rare dies ("KILLED", then it goes away), you close it, or 5 minutes pass. The chat line, center text and sound are still there. A rare that shows up mid-fight gets its Target button when the fight ends (the game doesn't let addons change it in combat).
