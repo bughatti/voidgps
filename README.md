@@ -13,9 +13,10 @@
 - **Coordinates**: "26 69" on the map you're on, or "Desolace 26 69"
 - **A party member**: a live route to them. **A friend**: their zone
 - **A herb or ore**: "briarthorn", "tin vein", "herb", "ore": a route to the nearest spot it can spawn
+- **Something a vendor sells** (WoW Forever): "mining pick" (or "pick axe"), "fishing pole", "flint and tinder", "simple wood": the nearest vendor of your faction that sells it for gold, and the way there. Vendors in zones well above your level come last
 - Your **recent places** when the box is empty. Up / Down / Enter / Esc work
 
-The search box sits in **VoidMap's** toolbar on the world map. Without the map open: the **Void hub icon** by the minimap, a key (Key Bindings > AddOns > VoidGPS), or `/gps`.
+**The search box stays on screen** (WoW Forever; on retail turn it on with `/gps dock`): drag it by its "VoidGPS" label to where you like. Its **x** hides it (bring it back with `/gps dock` or the Void hub's quick box); then `/gps`, the **Void hub icon** or a key (Key Bindings > AddOns > VoidGPS) opens it when you need it. It also sits in **VoidMap's** toolbar on the world map.
 
 ### The way there
 - **A line on the world map and the minimap**: cyan along walked paths, orange dashed where no one has walked yet (a straight line), white dashed for a flight, purple for a boat or zeppelin

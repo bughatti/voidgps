@@ -1,5 +1,12 @@
 # VoidGPS Changelog
 
+## 0.5.0
+
+- **Search for what vendors sell** (WoW Forever): type "mining pick" (or "pick axe"), "fishing pole", "flint and tinder", "simple wood"... and get the nearest vendor of your faction that sells it for gold, with the way there. Vendors in zones well above your level come last (and in VoidAH's Professions **Go** buttons too).
+- **The search box stays on screen** (WoW Forever; `/gps dock` on retail): drag it by its label where you like. Its **x** hides it; `/gps dock` or the Void hub's quick box brings it back.
+- **Typos are fine:** "ogrimmar", "orgrimar", "stormwnd" find the city; a name spelled a letter off is found when nothing else matches.
+- "mining" or "ore" no longer lists Armorers ("ore" was found inside "armorer").
+
 ## 0.4.0
 
 - **Errands:** vendor items to buy (from VoidAH's Professions tab) go on a small list out in the world, grouped by vendor, nearest first. Click a vendor for the way there; items tick off as they reach your bags. At the vendor, **Buy my errands here** buys what's left in one click (gold only, checks you can afford it).

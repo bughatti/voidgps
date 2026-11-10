@@ -107,12 +107,30 @@ end
 -- a vendor scan learned a cost (Costs.lua): build again on next use
 function ns.GoodsDirty() byItem = nil end
 
+-- a zone you're too low for (Zephras Isle at 31) goes last among far vendors (2026-11-10: the only
+-- other-continent Mining Pick vendors were Brill and Zephras Isle; the name decided)
+local levelCache = {}
+local function tooHigh(map)
+    local lvl = UnitLevel("player") or 0
+    local c = levelCache[map]
+    if c == nil then
+        local ok, minL = pcall(C_Map.GetMapLevels, map)
+        c = (ok and type(minL) == "number") and minL or 0
+        levelCache[map] = c
+    end
+    return c > lvl + 5
+end
+
 local function sortVendors(e, cont, px, py)
     for _, v in ipairs(e.vendors) do
         v.yards = (cont and v.cont == cont) and Geo.Dist(px, py, v.wx, v.wy) or nil
     end
     table.sort(e.vendors, function(a, b)
         if (a.yards ~= nil) ~= (b.yards ~= nil) then return a.yards ~= nil end
+        if not a.yards then
+            local ha, hb = tooHigh(a.map), tooHigh(b.map)
+            if ha ~= hb then return hb end
+        end
         -- a vendor you have seen selling it (verified) wins over a listed one up to 150 yards nearer
         if a.yards and b.yards then
             local da = a.yards - (a.verified and 150 or 0)

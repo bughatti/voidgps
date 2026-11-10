@@ -39,13 +39,31 @@ local SYN = {
     ore = { "ore" }, mining = { "ore" }, vein = { "ore" },
 }
 
+-- what people call a vendor item -> its real name (the user, 2026-11-10: "mining pick or pick axe
+-- doesnt show anything")
+local ITEM_ALIAS = {
+    ["pick axe"] = "mining pick", pickaxe = "mining pick", ["pick-axe"] = "mining pick", pick = "mining pick",
+    ["fishing rod"] = "fishing pole", rod = "fishing pole", pole = "fishing pole",
+    flint = "flint and tinder", tinder = "flint and tinder", ["flint & tinder"] = "flint and tinder",
+    ["skinning knife"] = "skinning knife", knife = "skinning knife",
+    hammer = "blacksmith hammer", ["smith hammer"] = "blacksmith hammer",
+    vial = "empty vial", vials = "empty vial", thread = "coarse thread",
+}
+
 ----------------------------------------------------------------------
 -- Index
 ----------------------------------------------------------------------
 local index
+local goods   -- vendor items your faction can buy: { item, name, lname } (Recipes.lua's Goods)
 
 local function buildIndex()
     index = {}
+    goods = {}
+    if ns.Goods then
+        for _, e in ipairs(ns.Goods:All() or {}) do
+            if e.name and #e.vendors > 0 then goods[#goods + 1] = { item = e.item, name = e.name, lname = e.name:lower(), lsub = "" } end
+        end
+    end
     local fac = G:FactionLetter()
     for _, n in ipairs(ns.NPCS or {}) do
         local f = n[6]
@@ -93,16 +111,59 @@ local function zoneByName(q)
     return best
 end
 
+local fuzzyAll = false   -- Find sets it for its second try, when nothing matched
+
+-- Typos: is q within 1 edit (2 for 6+ letters) of the start of n? A swap counts as one edit, so
+-- "ogr" and "ogrimmar" find Orgrimmar (the user, 2026-11-10: "it doesnt find ogr").
+local function editDist(a, b, maxd)
+    local la, lb = #a, #b
+    if math.abs(la - lb) > maxd then return maxd + 1 end
+    local prev2, prev, cur = {}, {}, {}
+    for j = 0, lb do prev[j] = j end
+    for i = 1, la do
+        cur = { [0] = i }
+        local best = i
+        local ai = a:byte(i)
+        for j = 1, lb do
+            local cost = (ai == b:byte(j)) and 0 or 1
+            local v = math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+            if i > 1 and j > 1 and ai == b:byte(j - 1) and a:byte(i - 1) == b:byte(j) then
+                v = math.min(v, prev2[j - 2] + 1)   -- a swap ("ogr" / "org")
+            end
+            cur[j] = v
+            if v < best then best = v end
+        end
+        if best > maxd then return maxd + 1 end   -- can't get back under: stop early
+        prev2, prev = prev, cur
+    end
+    return prev[lb]
+end
+
+local function nearPrefix(n, q)
+    if #q < 3 then return false end
+    local maxd = #q >= 6 and 2 or 1
+    for len = #q - maxd, #q + maxd do   -- 2 edits can be 2 extra / missing letters (Sol review)
+        if len >= 1 and len <= #n and editDist(q, n:sub(1, len), maxd) <= maxd then return true end
+    end
+    return false
+end
+
 local function score(e, q, syn)
     local n, s = e.lname, e.lsub
     if n == q then return 1000 end
     if n:sub(1, #q) == q then return 800 end
     if syn then
-        for _, t in ipairs(syn) do if s == t or s:find(t, 1, true) then return 650 end end
+        -- from the start of a word: "ore" is in "armorer" ("mining" listed Armorer & Shieldcrafters, 2026-11-10)
+        for _, t in ipairs(syn) do if s == t or (" " .. s):find(" " .. t, 1, true) then return 650 end end
     end
     if (" " .. n):find(" " .. q, 1, true) then return 600 end
-    if s ~= "" and s:find(q, 1, true) then return 550 end
+    -- a service: from the start of a word, or anywhere for 4+ letters ("smith" -> Blacksmithing
+    -- Supplies; "ore" must not find Armorers)
+    if s ~= "" and ((" " .. s):find(" " .. q, 1, true) or (#q >= 4 and s:find(q, 1, true))) then return 550 end
     if n:find(q, 1, true) then return 400 end
+    -- a zone or city spelled a bit wrong: always (few of them); anything else: only when asked
+    if e.kind == "zone" and nearPrefix(n, q) then return 620 end
+    if fuzzyAll and nearPrefix(n, q) then return 300 end
     return 0
 end
 
@@ -159,10 +220,40 @@ function S:Find(q)
 
     if not index then buildIndex() end
     local syn = SYN[q]
-    local hits = {}
-    for _, e in ipairs(index) do
-        local sc = score(e, q, syn)
-        if sc > 0 then hits[#hits + 1] = { e = e, s = sc } end
+    local iq = ITEM_ALIAS[q]
+    local hits, ih
+    local function collect()
+        hits, ih = {}, {}
+        for _, e in ipairs(index) do
+            local sc = score(e, q, syn)
+            if sc > 0 then hits[#hits + 1] = { e = e, s = sc } end
+        end
+        -- items vendors sell: the alias AND what you typed ("thread" -> Coarse Thread first, Fine
+        -- Thread still listed; Sol review)
+        for _, g in ipairs(goods or {}) do
+            local sc = score(g, q, nil)
+            if iq then sc = math.max(sc, score(g, iq, nil)) end
+            if sc > 0 then ih[#ih + 1] = { g = g, s = sc - 1 } end   -- a place with the same name wins a tie
+        end
+    end
+    collect()
+    if #hits == 0 and #ih == 0 then   -- nothing at all: try again allowing a typo in any name
+        fuzzyAll = true
+        collect()
+        fuzzyAll = false
+    end
+    -- items: routed to the nearest vendor that has it (for gold first). The best 8 matches only,
+    -- so a short query doesn't sort every vendor of a thousand items.
+    table.sort(ih, function(a, b) if a.s ~= b.s then return a.s > b.s end return a.g.name < b.g.name end)
+    for i = 1, math.min(#ih, MAX) do
+        local e = ns.Goods:Get(ih[i].g.item)
+        local v
+        for _, x in ipairs(e and e.vendors or {}) do if not x.cost then v = x; break end end
+        v = v or (e and e.vendors[1])
+        if v then
+            hits[#hits + 1] = { s = ih[i].s, d = v.yards or 1e7, e = { kind = "item", name = e.name,
+                sub = "Sold by " .. v.name, map = v.map, x = v.x, y = v.y, npc = true, vendor = v } }
+        end
     end
     -- distance for ranking: the nearest of a kind first (a service), exact names first
     local cont, px, py = Geo.Player()
@@ -175,7 +266,9 @@ function S:Find(q)
         if hits[i].s < cutoff or i > 3000 then break end
         keep = i
         local e = hits[i].e
-        if e.kind == "node" then
+        if hits[i].d then
+            -- an item: its vendor's distance is already known
+        elseif e.kind == "node" then
             local _, _, _, _, yd = ns.Nodes:Nearest({ e.name })
             hits[i].d = yd or 1e7
         else
@@ -183,7 +276,9 @@ function S:Find(q)
             hits[i].d = (c and c == cont) and Geo.Dist(px, py, x, y) or (c and 1e7 or 2e7)
         end
     end
-    for i = #hits, keep + 1, -1 do hits[i] = nil end
+    local kept = {}   -- a fresh list, not a nil-trimmed one (a sort over trailing nil slots can see nil)
+    for i = 1, keep do kept[i] = hits[i] end
+    hits = kept
     table.sort(hits, function(a, b)
         if a.s ~= b.s then return a.s > b.s end
         return (a.d or 3e7) < (b.d or 3e7)
@@ -196,7 +291,7 @@ function S:Find(q)
         if not seen[k] then
             seen[k] = true
             out[#out + 1] = { name = e.name, sub = e.sub, map = e.map, x = e.x, y = e.y, kind = e.kind, npc = e.npc,
-                dist = h.d and h.d < 1e7 and h.d or nil }
+                vendor = e.vendor, dist = h.d and h.d < 1e7 and h.d or nil }
         end
     end
     return out
@@ -211,6 +306,10 @@ local function go(r)
     if not r then return end
     if r.kind == "node" and ns.Nodes then
         if not ns.Nodes:Go({ r.name }) then G:Print("No spots known for " .. r.name .. ".") end
+        return
+    end
+    if r.kind == "item" and r.vendor and ns.Goods then
+        ns.Goods:GoVendor(r.vendor, r.name)   -- the way to the vendor ("Sells Mining Pick")
         return
     end
     if r.unit then
@@ -380,16 +479,42 @@ end
 ----------------------------------------------------------------------
 local inMap, window
 
+-- Docked: the search box stays on screen, where you dragged it (the user, 2026-11-10: "that gps
+-- box needs to always be up"). On by default; its x (or the Void hub's quick box, /gps dock)
+-- turns it off, and then /gps opens it as a popup that closes after a pick, as before.
+-- Default: on in WoW Forever (vendors, herbs, ore to find), off on retail (zones and coordinates only).
+local function docked()
+    local v = VoidGPSDB and VoidGPSDB.searchDock
+    if v == nil then return G.FOREVER and true or false end
+    return v
+end
+
+local function placeWindow()
+    window:ClearAllPoints()
+    local p = VoidGPSDB and VoidGPSDB.searchPos
+    if docked() and type(p) == "table" and p[1] then
+        window:SetPoint(p[1], UIParent, p[2] or p[1], p[3] or 0, p[4] or 0)
+    else
+        window:SetPoint("TOP", UIParent, "TOP", 0, docked() and -72 or -120)
+    end
+    window:SetFrameStrata(docked() and "MEDIUM" or "DIALOG")   -- docked: never over dialogs and bags
+end
+
 local function buildWindow()
     window = CreateFrame("Frame", "VoidGPSSearchWindow", UIParent)
-    window:SetSize(392, 34)
-    window:SetPoint("TOP", UIParent, "TOP", 0, -120)
-    window:SetFrameStrata("DIALOG")
+    window:SetSize(408, 30)
     window:EnableMouse(true)
     window:SetMovable(true)
+    window:SetClampedToScreen(true)
     window:RegisterForDrag("LeftButton")
     window:SetScript("OnDragStart", window.StartMoving)
-    window:SetScript("OnDragStop", window.StopMovingOrSizing)
+    window:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        if docked() then
+            local point, _, rel, x, y = self:GetPoint(1)
+            VoidGPSDB.searchPos = { point, rel, math.floor(x + 0.5), math.floor(y + 0.5) }
+        end
+    end)
     local bg = window:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetColorTexture(0.05, 0.05, 0.07, 0.95)
@@ -397,13 +522,52 @@ local function buildWindow()
     t:SetFont(FONT, 11, "OUTLINE")
     t:SetPoint("LEFT", 8, 0)
     t:SetText("|cff00c7ffVoidGPS|r")
+    -- x: docked, it turns the docked box off; else it just closes the popup
+    local x = CreateFrame("Button", nil, window)
+    x:SetSize(16, 16)
+    x:SetPoint("RIGHT", -5, 0)
+    local xt = x:CreateFontString(nil, "OVERLAY")
+    xt:SetFont(FONT, 11, "")
+    xt:SetPoint("CENTER")
+    xt:SetText("x")
+    xt:SetTextColor(0.6, 0.6, 0.66)
+    x:SetScript("OnEnter", function(self)
+        xt:SetTextColor(1, 0.4, 0.4)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        if docked() then
+            GameTooltip:SetText("Hide the search box", 1, 1, 1)
+            GameTooltip:AddLine("Bring it back with /gps dock or the Void hub's quick box (left-click the hub icon). /gps still opens it any time.", 0.8, 0.8, 0.8, true)
+        else
+            GameTooltip:SetText("Close", 1, 1, 1)
+        end
+        GameTooltip:Show()
+    end)
+    x:SetScript("OnLeave", function() xt:SetTextColor(0.6, 0.6, 0.66); GameTooltip:Hide() end)
+    x:SetScript("OnClick", function()
+        GameTooltip:Hide()
+        if docked() then S:SetDocked(false) else window:Hide() end
+    end)
     local w = makeWidget(window, 260, window)
-    w.eb:SetPoint("RIGHT", window, "RIGHT", -7, 0)
+    w.eb:SetPoint("RIGHT", x, "LEFT", -4, 0)
     w.rb:SetPoint("RIGHT", w.eb, "LEFT", -4, 0)
-    w.onChosen = function() window:Hide() end
-    w.onEscape = function() window:Hide() end
+    w.onChosen = function()
+        if docked() then w.eb:SetText("") else window:Hide() end
+    end
+    w.onEscape = function()
+        if docked() then w.eb:SetText("") else window:Hide() end
+    end
     window.w = w
+    placeWindow()
     window:Hide()
+end
+
+function S:Docked() return docked() end
+function S:SetDocked(on)
+    VoidGPSDB.searchDock = on and true or false
+    if not window then buildWindow() end
+    placeWindow()
+    window:SetShown(on)
+    if not on then G:Print("search box hidden. /gps opens it when you need it; /gps dock keeps it on screen again.") end
 end
 
 function S:Open(text)
@@ -433,6 +597,10 @@ function S:PaintRares()
 end
 
 G:OnReady(function()
+    if docked() then
+        if not window then buildWindow() end
+        window:Show()
+    end
     hostInVoidMap()
     if not inMap then C_Timer.After(1, hostInVoidMap) end
     if WorldMapFrame then WorldMapFrame:HookScript("OnShow", hostInVoidMap) end

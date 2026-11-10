@@ -61,6 +61,8 @@ SlashCmdList.VOIDGPS = function(msg)
     msg = (msg or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "stop" then
         if ns.Guide then ns.Guide:Stop("stopped") end
+    elseif msg == "dock" then
+        if ns.Search then ns.Search:SetDocked(not ns.Search:Docked() or not (VoidGPSSearchWindow and VoidGPSSearchWindow:IsShown())) end
     elseif msg == "rares" then
         G:SetRareAlerts(VoidGPSDB.rareAlerts == false)
     elseif msg == "rarelog" then
@@ -103,4 +105,10 @@ table.insert(VoidHubToggles, {
     tip = "A sound and a Target button when a rare is near (the Rares button by VoidGPS's search box).",
     get = function() return VoidGPSDB and VoidGPSDB.rareAlerts ~= false end,
     set = function(on) G:SetRareAlerts(on) end,
+})
+table.insert(VoidHubToggles, {
+    id = "VoidGPS.dock", group = "GPS", label = "Search box on screen",
+    tip = "Keep VoidGPS's search box on screen (drag it where you like). Off: /gps opens it when you need it.",
+    get = function() return ns.Search and ns.Search:Docked() end,
+    set = function(on) if ns.Search then ns.Search:SetDocked(on) end end,
 })
