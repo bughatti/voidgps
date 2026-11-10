@@ -55,6 +55,53 @@ local function build()
             end
         end
     end
+    -- What you've SEEN vendors sell (Costs.lua, VoidGPSDB.stock) wins over NorgannonDB: a
+    -- vendor you opened that doesn't stock an item drops off that item; a vendor that does is
+    -- added (or moved to where you stood), marked verified. (Wrong vial vendor, 2026-11-09.)
+    local stock = VoidGPSDB and VoidGPSDB.stock
+    if stock then
+        local byName = {}
+        for _, s in pairs(stock) do
+            if s.name and (fac == "" or not s.fac or s.fac == fac) then byName[s.name] = s end
+        end
+        for _, e in pairs(byItem) do
+            for i = #e.vendors, 1, -1 do
+                local v = e.vendors[i]
+                local s = byName[v.name]
+                if s and s.map == v.map and not s.items[e.item] then table.remove(e.vendors, i) end
+            end
+        end
+        for _, s in pairs(byName) do
+            local cont, wx, wy = Geo.ToWorld(s.map, s.x, s.y)
+            for item, it in pairs(s.items) do
+                local e = byItem[item]
+                if not e then
+                    local name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(item)
+                    local classID = select(6, C_Item.GetItemInfoInstant(item))
+                    local kind = (classID == 9 and "r") or (classID == 7 and "t") or (classID == 0 and "c")
+                        or ((classID == 2 or classID == 4) and "g") or "o"
+                    e = { item = item, name = name or ("item " .. item), kind = kind, buy = it.buy or 0,
+                          qty = it.qty or 1, limited = false, vendors = {} }
+                    byItem[item] = e
+                end
+                local have
+                for _, v in ipairs(e.vendors) do
+                    if v.name == s.name then have = v end
+                end
+                if have then
+                    have.verified = true
+                    have.map, have.x, have.y, have.cont, have.wx, have.wy = s.map, s.x, s.y, cont, wx, wy
+                else
+                    -- what it costs there besides gold, as for listed vendors (Sol review)
+                    local c = ns.Costs and ns.Costs:Offer(s.name, s.map, item, e.kind)
+                    local cost = c and c.pay and c or nil
+                    e.vendors[#e.vendors + 1] = { name = s.name, map = s.map, x = s.x, y = s.y, cont = cont,
+                        wx = wx, wy = wy, limited = it.limited or false, verified = true, cost = cost, rep = c and c.rep }
+                    if not cost and it.buy then e.gold = true end
+                end
+            end
+        end
+    end
 end
 
 -- a vendor scan learned a cost (Costs.lua): build again on next use
@@ -66,7 +113,12 @@ local function sortVendors(e, cont, px, py)
     end
     table.sort(e.vendors, function(a, b)
         if (a.yards ~= nil) ~= (b.yards ~= nil) then return a.yards ~= nil end
-        if a.yards and b.yards and a.yards ~= b.yards then return a.yards < b.yards end
+        -- a vendor you have seen selling it (verified) wins over a listed one up to 150 yards nearer
+        if a.yards and b.yards then
+            local da = a.yards - (a.verified and 150 or 0)
+            local db = b.yards - (b.verified and 150 or 0)
+            if da ~= db then return da < db end
+        end
         return a.name < b.name
     end)
 end

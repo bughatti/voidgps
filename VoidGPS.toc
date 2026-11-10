@@ -2,7 +2,7 @@
 ## Title: |cff00c7ffVoidGPS|r
 ## Notes: Type a place, an NPC, a service or a party member: a route that follows walked paths, flight paths and zeppelins, through zones
 ## Author: Vede
-## Version: 0.3.8
+## Version: 0.4.0
 ## SavedVariables: VoidGPSDB
 ## SavedVariablesPerCharacter: VoidHubCharDB
 ## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
@@ -16,6 +16,7 @@ Nodes.lua
 Recipes.lua
 Router.lua
 Guide.lua
+Errands.lua
 Hunt.lua
 RareAlert.lua
 Draw.lua

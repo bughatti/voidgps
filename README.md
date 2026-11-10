@@ -25,6 +25,14 @@ The search box sits in **VoidMap's** toolbar on the world map. Without the map o
 - Off the route? It plans a new one. Another continent? It plans the rest when you get there
 - A small box shows where you're going, the next step and how far. **Stop** ends it
 
+### Errands
+- Vendor items you need (from **VoidAH**'s Professions tab, **Vendor stops to errands**) go on a small list out in the world, grouped by vendor, nearest first, with how far. Click a vendor for the way there
+- Items tick off by themselves as they reach your bags; right-click one to drop it
+- At the vendor, **Buy my errands here** buys what's left in one click: gold only, and only if you can afford it
+
+### Vendors it has seen
+- Opening a merchant records what it really sells and where it stands. A vendor seen not selling an item drops off that item, and one seen selling it is added and preferred, so a wrong vendor in the bundled list fixes itself
+
 ### Is it up?
 For a rare that doesn't always spawn, or any NPC you're heading to:
 - A **Target** button in the box (and a key in Key Bindings) that tries to target it. Each press is one try

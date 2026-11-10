@@ -1,5 +1,11 @@
 # VoidGPS Changelog
 
+## 0.4.0
+
+- **Errands:** vendor items to buy (from VoidAH's Professions tab) go on a small list out in the world, grouped by vendor, nearest first. Click a vendor for the way there; items tick off as they reach your bags. At the vendor, **Buy my errands here** buys what's left in one click (gold only, checks you can afford it).
+- **Learns what vendors really sell:** opening a merchant records what it stocks and where it stands. A vendor seen not selling an item drops off that item; one seen selling it is added and preferred.
+- **Merchant cost scanning** only runs on WoW Forever (nothing uses it on retail).
+
 ## 0.3.8
 
 - **Routes for your quests (with VoidQuest):** hover a quest in another zone and VoidQuest shows the way there that VoidGPS works out, step by step: "Fly to Orgrimmar (from Camp Taurajo)", "Take the zeppelin outside Orgrimmar to Grom'gol", "Walk 832 yd to Hemet Nesingwary". Shift-click the quest and VoidGPS guides you leg by leg.

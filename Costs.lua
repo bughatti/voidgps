@@ -79,10 +79,42 @@ local function repNeeded(i)
     end
 end
 
+-- What this merchant really sells, and where they stand: VoidGPSDB.stock[npcID] = { name, map,
+-- x, y (0-1, where you stood), fac ("A"/"H"), t, items = { [itemID] = { buy = copper, qty, limited } } }.
+-- Recipes.lua prefers it over NorgannonDB's list: a vendor that turns out not to sell an item
+-- drops off that item, and one that does joins it. The user, 2026-11-09: the Empty / Leaded Vial
+-- vendor VoidGPS named was wrong, "i found someone across the way that had them".
+local function learnStock(n)
+    local guid = UnitGUID("npc")
+    local npcID = guid and not secret(guid) and tonumber(guid:match("^Creature%-%d+%-%d+%-%d+%-%d+%-(%d+)%-"))
+    local name = UnitName("npc")
+    if not (npcID and name) or secret(name) then return end
+    local map = C_Map.GetBestMapForUnit("player")
+    local pos = map and C_Map.GetPlayerMapPosition(map, "player")
+    if not pos then return end
+    local x, y = pos:GetXY()
+    local items = {}
+    for i = 1, n do
+        local item = safe(GetMerchantItemID, i)
+        local info = C_MerchantFrame and safe(C_MerchantFrame.GetItemInfo, i)
+        if item and not secret(item) and info then
+            items[item] = { buy = (not info.hasExtendedCost) and info.price or nil, qty = info.stackCount or 1,
+                            limited = (info.numAvailable or -1) >= 0 or nil }
+        end
+    end
+    if not next(items) then return end
+    VoidGPSDB.stock = VoidGPSDB.stock or {}
+    VoidGPSDB.stock[npcID] = { name = name, map = map, x = math.floor(x * 10000) / 10000, y = math.floor(y * 10000) / 10000,
+                               fac = G:FactionLetter(), t = time(), items = items }
+    if ns.GoodsDirty then ns.GoodsDirty() end   -- vendor lists rebuild with it next time
+end
+
 local function scan()
+    if not G.FOREVER then return end   -- costs and vendor lists are WoW Forever data (audit 2026-11-09)
     local n = safe(GetMerchantNumItems) or 0
     local vendor = UnitName("npc")
     if n == 0 or not vendor or secret(vendor) then return end
+    learnStock(n)
     VoidGPSDB.costs = VoidGPSDB.costs or {}
     local db, changed = VoidGPSDB.costs, false
     for i = 1, n do
