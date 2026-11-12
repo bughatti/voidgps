@@ -89,8 +89,21 @@ end
 -- change or hide a secure button in combat, so without it the button would keep targeting
 -- the rare it was set for (even after the popup closed, or moved on to another rare).
 -- Changes happen only out of combat; anything asked for in combat waits for the fight to end.
+-- The button sits over the popup's bottom-right corner. It is anchored to UIParent, not to the
+-- popup (a secure frame anchored to the popup would make the popup protected, so it couldn't be
+-- dragged in a fight); so after the popup moves, it's lined up again out of combat.
+local function alignButton()
+    if not (tb and tb.ready and pop) or InCombatLockdown() then return end
+    local r, b = pop:GetRight(), pop:GetBottom()
+    if not (r and b) then return end
+    local k = pop:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    tb:ClearAllPoints()
+    tb:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", r * k - 10, b * k + 8)
+end
+
 local function placeButton(name)
     if InCombatLockdown() or not (tb and tb.ready) then pendingTarget = name; return false end
+    alignButton()
     pendingTarget, hideTbLater = nil, nil
     tb:SetAttribute("macrotext", "/targetexact " .. name)
     RegisterStateDriver(tb, "visibility", "[combat] hide; show")
@@ -121,6 +134,8 @@ local function build()
     pop:SetSize(280, 74)
     pop:SetPoint("TOP", UIParent, "TOP", 0, -150)
     pop:SetFrameStrata("HIGH")
+    -- drag to move, kept after a restart (the user, 11-12: every pop-up box movable)
+    ns.Move(pop, { db = function() return VoidGPSDB end, key = "rarePopup", onMoved = function() alignButton() end })
     pop:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = VoidPX() })
     pop:SetBackdropColor(0.03, 0.08, 0.11, 0.94)
     pop:SetBackdropBorderColor(0.2, 1, 0.4, 0.9)
@@ -154,9 +169,9 @@ local function build()
     x:SetTextColor(0.8, 0.4, 0.4)
     close:SetScript("OnClick", function() R:Hide() end)
 
-    -- the Target button: secure, on UIParent, over the popup's bottom-right corner (the
-    -- popup never moves, so a fixed spot works and nothing protected is anchored to it)
-    -- created and set up out of combat only (a /reload mid-fight: after the fight)
+    -- the Target button: secure, on UIParent, over the popup's bottom-right corner (alignButton;
+    -- nothing protected is anchored to the popup); created and set up out of combat only (a
+    -- /reload mid-fight: after the fight)
     local function secureSetup()
         tb = CreateFrame("Button", "VoidGPSRareTargetButton", UIParent, "SecureActionButtonTemplate")
         tb:SetSize(76, 22)
@@ -237,6 +252,7 @@ G:OnReady(function()
     ev:SetScript("OnEvent", function(_, event, unit)
         if event == "PLAYER_REGEN_ENABLED" then
             if R.setupLater then local f = R.setupLater; R.setupLater = nil; f() end
+            alignButton()   -- the popup may have been dragged during the fight
             -- (the state driver would show the button again now the fight is over)
             local want = pendingTarget   -- a rare that showed up mid-fight (hideButton clears it)
             if hideTbLater then hideButton() end

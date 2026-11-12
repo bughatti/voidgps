@@ -1,4 +1,4 @@
-# VoidGPS
+# VoidGPS - Route Finder & Travel Directions
 
 **Works on:** WoW Forever · WoW Midnight (search for zones, coordinates and party members)
 
@@ -60,4 +60,4 @@ The WoW Forever NPC, rare, object, herb, ore, vendor recipe and zeppelin data co
 
 ---
 
-*Part of the Void addon family by Vede · GPL-3.0 licensed · [Source & bug reports](https://github.com/bughatti/voidgps) · [All Void addons](https://www.curseforge.com/members/bughatti/projects) · free M+ & raid player lookups at [voidscout.io](https://voidscout.io) · more at [tinkerline.io](https://tinkerline.io) · [Discord](https://discord.gg/7ZHmx7zMDh)*
+*Part of the Void addon family by Vede · GPL-3.0 licensed · [Source & bug reports](https://github.com/bughatti/voidgps) · [All Void addons](https://www.curseforge.com/members/bughatti/projects) · free M+ & raid player lookups at [voidscout.io](https://voidscout.io) · more at [tinkerline.io](https://tinkerline.io/addons/voidgps/) · [Discord](https://discord.gg/7ZHmx7zMDh)*

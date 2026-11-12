@@ -491,8 +491,9 @@ end
 
 local function placeWindow()
     window:ClearAllPoints()
-    local p = VoidGPSDB and VoidGPSDB.searchPos
-    if docked() and type(p) == "table" and p[1] then
+    -- docked and popup each keep their own spot (the user, 11-12: every box stays where it was moved)
+    local p = VoidGPSDB and VoidGPSDB[docked() and "searchPos" or "searchPopPos"]   -- (an and/or on the values mixed them up)
+    if type(p) == "table" and p[1] then
         window:SetPoint(p[1], UIParent, p[2] or p[1], p[3] or 0, p[4] or 0)
     else
         window:SetPoint("TOP", UIParent, "TOP", 0, docked() and -72 or -120)
@@ -510,9 +511,9 @@ local function buildWindow()
     window:SetScript("OnDragStart", window.StartMoving)
     window:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        if docked() then
-            local point, _, rel, x, y = self:GetPoint(1)
-            VoidGPSDB.searchPos = { point, rel, math.floor(x + 0.5), math.floor(y + 0.5) }
+        local point, _, rel, x, y = self:GetPoint(1)
+        if point and VoidGPSDB then
+            VoidGPSDB[docked() and "searchPos" or "searchPopPos"] = { point, rel, math.floor(x + 0.5), math.floor(y + 0.5) }
         end
     end)
     local bg = window:CreateTexture(nil, "BACKGROUND")

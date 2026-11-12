@@ -1,5 +1,13 @@
 # VoidGPS Changelog
 
+## 0.5.1 — 2026-11-12
+
+- **Fixed (WoW Forever): routes used flight paths you don't have.** Away from a flight master the game reports every flight path as known, so a route could say "fly to Stonard" to a character who has never been there. VoidGPS now learns the flight paths each character really knows (when you open a flight master's map, and when you discover a new one) and only plans with those. Open any flight master once on each character to teach it.
+- **For VoidQuest's route plan:** a quick travel-time estimate between any two places (walking, flight paths, boats and zeppelins), so VoidQuest can put your quests in the best order.
+- **Two characters with the same name on different realms** no longer share one list of known flight paths.
+- **The rare pop-up can be dragged** and stays where you put it, even after a restart; its Target button moves with it. The search box remembers its docked and its popped-out spot separately.
+- **Void hub button:** left-click opens one panel with all your Void addons by name, grouped, each with its own on/off switches (it replaces the ring of icons), with a background slider. The hub's info window now stays where you put it.
+
 ## 0.5.0
 
 - **Search for what vendors sell** (WoW Forever): type "mining pick" (or "pick axe"), "fishing pole", "flint and tinder", "simple wood"... and get the nearest vendor of your faction that sells it for gold, with the way there. Vendors in zones well above your level come last (and in VoidAH's Professions **Go** buttons too).

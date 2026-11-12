@@ -439,6 +439,24 @@ function G:DescribeRoute(target)
     return text, route.cost, steps
 end
 
+-- For other Void addons (VoidQuest's route planner, 2026-11-11): rough seconds from a to b, each
+-- { map, x, y } (x, y 0-1), or a = nil for where you stand. No path search, so it's cheap enough
+-- to ask for every two stops of a quest log. -> seconds | nil (no known way, e.g. an ocean
+-- nobody has crossed yet).
+function G:TravelTime(a, b, linkList)
+    local from
+    if a then from = targetPos(a) else
+        local cont, x, y, map = Geo.Player()
+        from = cont and { cont = cont, x = x, y = y, map = map }
+    end
+    local to = b and targetPos(b)
+    if not (from and to) then return nil end
+    local ok, sec = pcall(ns.Router.Estimate, ns.Router, from, to, linkList)
+    return ok and sec or nil
+end
+-- the boats and zeppelins, once per planning run (TravelTime takes them back as linkList)
+function G:TravelLinks() return ns.Router.Links and ns.Router.Links() or nil end
+
 -- For other Void addons: where an NPC stands, by name (your faction's first, never a hostile rare),
 -- from VoidGPS's places. -> { name, map, x, y } (x, y 0-1) or nil
 local npcIndex

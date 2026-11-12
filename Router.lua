@@ -201,14 +201,42 @@ end
 ----------------------------------------------------------------------
 -- Flight paths you know on this continent (world coordinates)
 ----------------------------------------------------------------------
+-- The flight paths THIS character knows. Away from a flight master, WoW Forever reports every
+-- flight path as discovered (checked 2026-11-11: GetTaxiNodesForMap(Eastern Kingdoms) gave 0
+-- undiscovered, Stonard included, for a character who had never been there; the route planner
+-- then sent the user to the Swamp of Sorrows "by air"). The flight master's own map knows:
+-- GetAllTaxiNodes gives Current / Reachable for the ones you have. Saved per character in
+-- VoidGPSDB.knownFP[name] when a flight map opens, and a new flight path is added when the game
+-- says "New flight path discovered" (the nearest one). Until a character has opened a flight map,
+-- every flight path counts, as before; per continent, since a flight map lists that continent only.
+-- Name-Realm (Codex 11-12: GetUnitName("player", true) leaves your own realm off, so the same name on
+-- two realms shared one list). A list saved under the plain name moves over once.
+local function charKey()
+    local name = UnitName("player") or "?"
+    local realm = GetRealmName and GetRealmName()
+    return (realm and realm ~= "") and (name .. "-" .. realm:gsub("%s", "")) or name
+end
+local function knownFP()
+    local d = VoidGPSDB and VoidGPSDB.knownFP
+    if not d then return nil end
+    local k = charKey()
+    if d[k] == nil then
+        local old = UnitName("player")
+        if old and old ~= k and type(d[old]) == "table" then d[k], d[old] = d[old], nil end
+    end
+    return d[k]
+end
 local function flightNodes(contMapID)
     local list = {}
     if not (contMapID and C_TaxiMap and C_TaxiMap.GetTaxiNodesForMap) then return list end
     local fac = UnitFactionGroup("player")
+    local known = knownFP()
     for _, n in ipairs(C_TaxiMap.GetTaxiNodesForMap(contMapID) or {}) do
         local mine = n.faction == nil or n.faction == Enum.FlightPathFaction.Neutral
             or (n.faction == Enum.FlightPathFaction.Horde and fac == "Horde")
             or (n.faction == Enum.FlightPathFaction.Alliance and fac == "Alliance")
+        local name = n.name
+        if name and (name:find("^zzOLD") or (known and known[name] == false)) then mine = false end
         if mine and not n.isUndiscovered and n.position then
             local cont, x, y = Geo.ToWorld(contMapID, n.position.x, n.position.y)
             if cont then list[#list + 1] = { cont = cont, x = x, y = y, name = n.name } end
@@ -321,3 +349,102 @@ function R:Plan(from, to)
     legs[#legs + 1] = { kind = "walk", cont = to.cont, known = false, pts = { { best.to.x, best.to.y }, { to.x, to.y } } }
     return { legs = legs, cost = bestCost }
 end
+
+----------------------------------------------------------------------
+-- A quick travel-time estimate, no path search (for VoidQuest's route planner, the user
+-- 2026-11-11: "start the route planner", which needs the time between every two stops of
+-- a quest log). Same continent: walking a straight line (x1.3 for the bends) or the
+-- nearest flight paths when clearly quicker; another continent: the cheapest known boat or
+-- zeppelin. from / to = { cont, x, y, map } (world). -> seconds, or nil when no way is known.
+----------------------------------------------------------------------
+local nodeCache = {}   -- [contMapID] = { t = GetTime(), list }
+local function cachedNodes(contMapID)
+    local c = contMapID and nodeCache[contMapID]
+    if c and GetTime() - c.t < 60 then return c.list end
+    local list = flightNodes(contMapID)
+    if contMapID then nodeCache[contMapID] = { t = GetTime(), list = list } end
+    return list
+end
+local function sameContEstimate(contMapID, ax, ay, bx, by, run)
+    local cost = Geo.Dist(ax, ay, bx, by) * 1.3 / run
+    local nodes = cachedNodes(contMapID)
+    local A, dA = nearestNode(nodes, ax, ay)
+    local B, dB = nearestNode(nodes, bx, by)
+    if A and B and A ~= B then
+        local fly = dA * 1.3 / run + Geo.Dist(A.x, A.y, B.x, B.y) * 1.3 / FLY_SPEED + 20 + dB * 1.3 / run
+        if fly < cost then cost = fly end
+    end
+    return cost
+end
+function R:Estimate(from, to, linkList)
+    if not (from and to and from.cont and to.cont) then return nil end
+    local run = runSpeed()
+    if from.cont == to.cont then
+        return sameContEstimate(Geo.ContinentMap(from.map), from.x, from.y, to.x, to.y, run)
+    end
+    local best
+    for _, l in ipairs(linkList or links()) do
+        if l.from.c == from.cont and l.to.c == to.cont then
+            local cost = sameContEstimate(Geo.ContinentMap(from.map), from.x, from.y, l.from.x, l.from.y, run)
+                + RIDE_TIME + Geo.Dist(l.to.x, l.to.y, to.x, to.y) * 1.3 / run
+            if not best or cost < best then best = cost end
+        end
+    end
+    return best
+end
+
+----------------------------------------------------------------------
+-- Learning which flight paths this character knows (see knownFP above)
+----------------------------------------------------------------------
+local function learned(name, known)
+    if not name or name == "" then return end
+    VoidGPSDB = VoidGPSDB or {}
+    VoidGPSDB.knownFP = VoidGPSDB.knownFP or {}
+    knownFP()   -- moves a list saved under the plain name over first
+    local key = charKey()
+    VoidGPSDB.knownFP[key] = VoidGPSDB.knownFP[key] or {}
+    -- false = the flight map says you don't have it; flight paths never seen stay nil and count, so a
+    -- continent whose flight map you haven't opened yet keeps working as before
+    VoidGPSDB.knownFP[key][name] = known and true or false
+    wipe(nodeCache)
+end
+local fpEv = CreateFrame("Frame")
+fpEv:RegisterEvent("TAXIMAP_OPENED")
+fpEv:RegisterEvent("UI_INFO_MESSAGE")
+fpEv:SetScript("OnEvent", function(_, event, _, msg)
+    if event == "TAXIMAP_OPENED" then
+        -- WoW Forever's flight map answers the classic calls (checked 2026-11-11: GetTaxiMapID nil,
+        -- GetAllTaxiNodes empty; NumTaxiNodes lists EVERY flight path of the continent: CURRENT 1 and
+        -- REACHABLE 5 = the ones you have, DISTANT 8 = the ones you DON'T (Stonard, Light's Hope,
+        -- Thorium Point ...)); the newer calls as a fallback
+        local n = NumTaxiNodes and NumTaxiNodes() or 0
+        for i = 1, n do
+            local kind = TaxiNodeGetType and TaxiNodeGetType(i)
+            learned(TaxiNodeName(i), kind == "CURRENT" or kind == "REACHABLE")
+        end
+        if n == 0 then
+            local mapID = GetTaxiMapID and GetTaxiMapID()   -- a global, not C_TaxiMap (Codex 11-12)
+            local nodes = mapID and C_TaxiMap.GetAllTaxiNodes and C_TaxiMap.GetAllTaxiNodes(mapID) or {}
+            local S = Enum.FlightPathState or {}
+            for _, nd in ipairs(nodes) do
+                learned(nd.name, nd.state == (S.Current or 0) or nd.state == (S.Reachable or 1))
+            end
+        end
+    elseif type(msg) == "string" and ERR_NEWTAXIPATH and msg == ERR_NEWTAXIPATH then
+        -- "New flight path discovered!": the flight master you're standing at
+        local cont, x, y, map = Geo.Player()
+        local contMap = map and Geo.ContinentMap(map)
+        if not (cont and contMap) then return end
+        local best, bd
+        for _, n in ipairs(C_TaxiMap.GetTaxiNodesForMap(contMap) or {}) do
+            local c2, nx, ny
+            if n.position then c2, nx, ny = Geo.ToWorld(contMap, n.position.x, n.position.y) end   -- (not "and": it keeps one value)
+            if c2 == cont and nx then
+                local d = Geo.Dist(nx, ny, x, y)
+                if not bd or d < bd then best, bd = n, d end
+            end
+        end
+        if best and bd < 60 then learned(best.name, true) end
+    end
+end)
+R.KnownFlightPaths = function() return knownFP() end
