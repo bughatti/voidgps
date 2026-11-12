@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.5.2 — 2026-11-12
+
+- **Fixed: a side of a box could be missing**, e.g. the right line of the recipes box and its buttons when the game window is an odd number of pixels wide. Every Void box now always shows all four border lines.
+
 ## 0.5.1 — 2026-11-12
 
 - **Fixed (WoW Forever): routes used flight paths you don't have.** Away from a flight master the game reports every flight path as known, so a route could say "fly to Stonard" to a character who has never been there. VoidGPS now learns the flight paths each character really knows (when you open a flight master's map, and when you discover a new one) and only plans with those. Open any flight master once on each character to teach it.
