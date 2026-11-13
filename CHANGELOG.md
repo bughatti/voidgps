@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.6.0 — 2026-11-13
+
+- **Which mobs drop crafting materials** (WoW Forever): for 139 materials (meat, cloth, eggs, spider legs...), the normal mobs that drop them, with drop chance, level and where they spawn, from NorgannonDB. Mobs are ranked by drop chance times how many spawn, so a big camp beats three rare casters. VoidProf's leveling plan uses it to weigh farming a material yourself against buying it.
+
 ## 0.5.2 — 2026-11-12
 
 - **Fixed: a side of a box could be missing**, e.g. the right line of the recipes box and its buttons when the game window is an odd number of pixels wide. Every Void box now always shows all four border lines.

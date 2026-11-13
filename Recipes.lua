@@ -190,3 +190,10 @@ ns.Goods = make(nil)
 G.Goods = ns.Goods
 ns.Recipes = make("r")
 G.Recipes = ns.Recipes
+
+-- VoidGPS.Drops:Get(item) -> { { mob, uiMap, minLevel, maxLevel, drop %, x, y, spawns }, ... } or nil:
+-- the normal mobs that drop a crafting material (Drops.lua, from NorgannonDB). VoidProf's leveling
+-- plan prices "farm it yourself" from it.
+ns.Drops = {}
+function ns.Drops:Get(item) return ns.DROPS and ns.DROPS[item] end
+G.Drops = ns.Drops
