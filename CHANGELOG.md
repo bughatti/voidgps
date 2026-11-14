@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.7.0 — 2026-11-13
+
+- **Search finds quest rewards** (WoW Forever): type an item a quest gives, like "sword of omen", and you get the quest, the level it needs and who gives it (and "pick one" when the quest is known to let you choose). Click it and VoidGPS takes you to the quest giver (Varimathras in Undercity for that one). Only your faction's quests show, and when a vendor sells the same item the vendor comes first.
+
 ## 0.6.0 — 2026-11-13
 
 - **Which mobs drop crafting materials** (WoW Forever): for 139 materials (meat, cloth, eggs, spider legs...), the normal mobs that drop them, with drop chance, level and where they spawn, from NorgannonDB. Mobs are ranked by drop chance times how many spawn, so a big camp beats three rare casters. VoidProf's leveling plan uses it to weigh farming a material yourself against buying it.

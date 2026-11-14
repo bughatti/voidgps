@@ -86,6 +86,17 @@ local function buildIndex()
         index[#index + 1] = { kind = "node", name = name, sub = k .. " · nearest spot",
             lname = name:lower(), lsub = k:lower() }
     end
+    -- quest rewards (Rewards.lua, WoW Forever): an item routes to the giver of the quest that gives
+    -- it (the user, 2026-11-13: "Sword of Omen is a sword from sm and i cant find it")
+    for _, r in ipairs(ns.QREWARDS or {}) do
+        local side = r[6]
+        if side == "" or fac == "" or side == fac then
+            local sub = "Quest reward · " .. r[3] .. (r[5] > 0 and (" (" .. r[5] .. "+)") or "")
+                .. (r[11] == 1 and " · pick one" or "") .. " · from " .. r[7]
+            index[#index + 1] = { kind = "reward", name = r[1], sub = sub, map = r[8], x = r[9] / 10000, y = r[10] / 10000,
+                npc = true, item = r[2], giver = r[7], quest = r[3], lname = r[1]:lower(), lsub = "quest reward" }
+        end
+    end
     local seen = {}
     for _, root in ipairs({ 946, 947 }) do
         for _, z in ipairs(C_Map.GetMapChildrenInfo(root, Enum.UIMapType.Zone, true) or {}) do
@@ -226,6 +237,9 @@ function S:Find(q)
         hits, ih = {}, {}
         for _, e in ipairs(index) do
             local sc = score(e, q, syn)
+            -- a quest reward ranks under a vendor selling the same item (the shop next to you, not a
+            -- quest across the world: "mining pick" is also a Stepping Stones reward)
+            if sc > 0 and e.kind == "reward" then sc = sc - 2 end
             if sc > 0 then hits[#hits + 1] = { e = e, s = sc } end
         end
         -- items vendors sell: the alias AND what you typed ("thread" -> Coarse Thread first, Fine
@@ -291,7 +305,7 @@ function S:Find(q)
         if not seen[k] then
             seen[k] = true
             out[#out + 1] = { name = e.name, sub = e.sub, map = e.map, x = e.x, y = e.y, kind = e.kind, npc = e.npc,
-                vendor = e.vendor, dist = h.d and h.d < 1e7 and h.d or nil }
+                vendor = e.vendor, giver = e.giver, quest = e.quest, dist = h.d and h.d < 1e7 and h.d or nil }
         end
     end
     return out
@@ -310,6 +324,12 @@ local function go(r)
     end
     if r.kind == "item" and r.vendor and ns.Goods then
         ns.Goods:GoVendor(r.vendor, r.name)   -- the way to the vendor ("Sells Mining Pick")
+        return
+    end
+    if r.kind == "reward" and r.giver then
+        -- the way to the quest giver (named for arrival), the item and quest in the subtitle
+        ns.Guide:Start({ name = r.giver, sub = r.quest .. " · reward: " .. r.name, map = r.map, x = r.x, y = r.y, npc = true })
+        if WorldMapFrame and WorldMapFrame:IsShown() and r.map then WorldMapFrame:SetMapID(r.map) end
         return
     end
     if r.unit then
