@@ -2,7 +2,7 @@
 -- Costs.lua — what a vendor offer really costs: gold, or Merchant's Favor and
 -- reputation (WoW Forever's Azeroth Commerce Authority), or another currency.
 --
--- The vendor data (Places.lua) only knows gold prices: NorgannonDB has no costs
+-- The vendor data (Places.lua) only knows gold prices: VoidDB has no costs
 -- and Blizzard's item API only lists the skill. So:
 --   * the 14 ACA supply-post vendors' recipes are taken to cost Merchant's Favor
 --     (the guides and the in-game vendor agree, 2026-11-07), and
@@ -24,7 +24,7 @@ G.Costs = C
 C.FAVOR = "Merchant's Favor"
 C.FACTION = "Azeroth Commerce Authority"
 
--- NorgannonDB npc IDs 248196-248202 (Horde, the depot west of the Crossroads) and
+-- VoidDB npc IDs 248196-248202 (Horde, the depot west of the Crossroads) and
 -- 256729-256735 (Alliance, Three Corners, Redridge). Places.lua rows carry no npc ID,
 -- so they're matched by name and map.
 C.ACA = {
@@ -81,7 +81,7 @@ end
 
 -- What this merchant really sells, and where they stand: VoidGPSDB.stock[npcID] = { name, map,
 -- x, y (0-1, where you stood), fac ("A"/"H"), t, items = { [itemID] = { buy = copper, qty, limited } } }.
--- Recipes.lua prefers it over NorgannonDB's list: a vendor that turns out not to sell an item
+-- Recipes.lua prefers it over VoidDB's list: a vendor that turns out not to sell an item
 -- drops off that item, and one that does joins it. The user, 2026-11-09: the Empty / Leaded Vial
 -- vendor VoidGPS named was wrong, "i found someone across the way that had them".
 local function learnStock(n)

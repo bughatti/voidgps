@@ -24,7 +24,7 @@ function G:Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage("|cff00c7ff[VoidGPS]|r " .. tostring(msg))
 end
 
--- The player's faction letter as NorgannonDB writes it (A / H).
+-- The player's faction letter as VoidDB writes it (A / H).
 function G:FactionLetter()
     local f = UnitFactionGroup("player")
     return f == "Horde" and "H" or (f == "Alliance" and "A" or "")

@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------
--- Recipes.lua — what vendors sell and where (Places.lua: NorgannonDB's vendor
+-- Recipes.lua — what vendors sell and where (Places.lua: VoidDB's vendor
 -- lists, item data from Blizzard's Forever API; holiday vendors left out).
 --
 --   VoidGPS.Goods:All(kind)      -> { entry, ... } vendors your faction can use, nearest first;
@@ -55,7 +55,7 @@ local function build()
             end
         end
     end
-    -- What you've SEEN vendors sell (Costs.lua, VoidGPSDB.stock) wins over NorgannonDB: a
+    -- What you've SEEN vendors sell (Costs.lua, VoidGPSDB.stock) wins over VoidDB: a
     -- vendor you opened that doesn't stock an item drops off that item; a vendor that does is
     -- added (or moved to where you stood), marked verified. (Wrong vial vendor, 2026-11-09.)
     local stock = VoidGPSDB and VoidGPSDB.stock
@@ -191,8 +191,114 @@ G.Goods = ns.Goods
 ns.Recipes = make("r")
 G.Recipes = ns.Recipes
 
--- VoidGPS.Drops:Get(item) -> { { mob, uiMap, minLevel, maxLevel, drop %, x, y, spawns }, ... } or nil:
--- the normal mobs that drop a crafting material (Drops.lua, from NorgannonDB). VoidProf's leveling
+-- VoidGPS.Trainers:For(spellID) -> the trainers that teach a profession recipe (Places.lua ns.TRAINS,
+-- from CMaNGOS classic-db), your faction's, nearest first: { { name, title, map, x, y (0..1), req
+-- (skill needed), cost (copper), yards }, ... }. nil = no trainer teaches it (a book, a drop or a
+-- quest); an empty list = only the other faction's trainers do. (The user, 2026-11-15: Heavy
+-- Mageweave Bandage is only taught by the two Trauma Surgeons, not by First Aid trainers.)
+-- VoidGPS.Trainers:Go(t) -> route to one of them
+ns.Trainers = {}
+function ns.Trainers:For(spell)
+    local s = ns.TRAINS and spell and ns.TRAINS[spell]
+    if not s then return nil end
+    local fac = G:FactionLetter()
+    local cont, px, py = Geo.Player()
+    local out = {}
+    for row, req, cost in s:gmatch("(%d+):(%d+):(%d+)") do
+        local npc = ns.NPCS and ns.NPCS[tonumber(row)]
+        if npc and (fac == "" or npc[6]:find(fac, 1, true)) then
+            local vx, vy = npc[4] / 10000, npc[5] / 10000
+            local c, wx, wy = Geo.ToWorld(npc[3], vx, vy)
+            out[#out + 1] = { name = npc[1], title = npc[2], map = npc[3], x = vx, y = vy, req = tonumber(req),
+                cost = tonumber(cost), yards = (cont and c == cont and wx) and Geo.Dist(px, py, wx, wy) or nil }
+        end
+    end
+    table.sort(out, function(a, b)
+        if (a.yards ~= nil) ~= (b.yards ~= nil) then return a.yards ~= nil end
+        if a.yards and b.yards and a.yards ~= b.yards then return a.yards < b.yards end
+        if not a.yards then
+            local ha, hb = tooHigh(a.map), tooHigh(b.map)
+            if ha ~= hb then return hb end
+        end
+        return a.name < b.name
+    end)
+    return out
+end
+-- a profession rank by name ("Journeyman Skinning", "Artisan Tailoring"): the trainers of it
+-- When CMaNGOS (Classic) has no trainer of it for your faction, the trainers whose title says the rank
+-- (WoW Forever moved Artisan Enchanting from Annora inside Uldaman to Hgarth / Kitta Firewind,
+-- "Artisan Enchanter"; found by the skill-cap test 2026-11-15).
+local NOUN = { Alchemy = "Alchemist", Blacksmithing = "Blacksmith", Enchanting = "Enchanter", Engineering = "Engineer",
+    Herbalism = "Herbalis", Leatherworking = "Leatherworker", Mining = "Min", Skinning = "Skinn", Tailoring = "Tailor",
+    Cooking = "Cook", Fishing = "Fish", ["First Aid"] = "First Aid" }
+function ns.Trainers:ForRank(name)
+    local spell = ns.TRAINRANK and name and ns.TRAINRANK[name]
+    local list = spell and self:For(spell) or nil
+    if list and #list > 0 then return list end
+    local rank, prof = (name or ""):match("^(%a+) (.+)$")
+    local noun = prof and NOUN[prof]
+    if not noun then return list end
+    local fac = G:FactionLetter()
+    local cont, px, py = Geo.Player()
+    local out = {}
+    for _, npc in ipairs(ns.NPCS or {}) do
+        if npc[7] == 1 and npc[2]:find(rank, 1, true) and npc[2]:find(noun, 1, true)
+            and (fac == "" or npc[6]:find(fac, 1, true)) then
+            local vx, vy = npc[4] / 10000, npc[5] / 10000
+            local c, wx, wy = Geo.ToWorld(npc[3], vx, vy)
+            out[#out + 1] = { name = npc[1], title = npc[2], map = npc[3], x = vx, y = vy,
+                yards = (cont and c == cont and wx) and Geo.Dist(px, py, wx, wy) or nil }
+        end
+    end
+    table.sort(out, function(a, b)
+        if (a.yards ~= nil) ~= (b.yards ~= nil) then return a.yards ~= nil end
+        if a.yards and b.yards and a.yards ~= b.yards then return a.yards < b.yards end
+        return a.name < b.name
+    end)
+    return out
+end
+function ns.Trainers:Go(t)
+    if not (t and t.map) then return false end
+    ns.Guide:Start({ name = t.name, sub = t.title ~= "" and t.title or "Trainer", map = t.map, x = t.x, y = t.y })
+    return true
+end
+G.Trainers = ns.Trainers
+
+-- VoidGPS.Skin (Skin.lua, tools/cmd/vgps-skin): the normal hostile mobs you can skin.
+--   :For(minL, maxL) -> { { mob, map, minL, maxL, n (spawns there), x, y (0..1), yards }, ... } whose
+--                       levels overlap minL..maxL, nearest first (same continent), then most spawns
+--   :Go(e)           -> route to one of them
+-- VoidProf's Skinning guide uses it (the user, 2026-11-15: "do the skinning guide").
+ns.Skin = {}
+function ns.Skin:For(minL, maxL)
+    local cont, px, py = Geo.Player()
+    local out = {}
+    for map, list in pairs(ns.SKIN or {}) do
+        for _, m in ipairs(list) do
+            if m[3] >= minL and m[2] <= maxL then
+                local c, wx, wy = Geo.ToWorld(map, m[5], m[6])
+                out[#out + 1] = { mob = m[1], map = map, minL = m[2], maxL = m[3], n = m[4], x = m[5], y = m[6],
+                    yards = (cont and c == cont and wx) and Geo.Dist(px, py, wx, wy) or nil }
+            end
+        end
+    end
+    table.sort(out, function(a, b)
+        if (a.yards ~= nil) ~= (b.yards ~= nil) then return a.yards ~= nil end
+        if a.yards and b.yards and a.yards ~= b.yards then return a.yards < b.yards end
+        if a.n ~= b.n then return a.n > b.n end
+        return a.mob < b.mob
+    end)
+    return out
+end
+function ns.Skin:Go(e)
+    if not (e and e.map) then return false end
+    ns.Guide:Start({ name = e.mob, sub = ("Skin: level %d-%d"):format(e.minL, e.maxL), map = e.map, x = e.x, y = e.y })
+    return true
+end
+G.Skin = ns.Skin
+
+-- VoidGPS.Drops:Get(item) ->{ { mob, uiMap, minLevel, maxLevel, drop %, x, y, spawns }, ... } or nil:
+-- the normal mobs that drop a crafting material (Drops.lua, from VoidDB). VoidProf's leveling
 -- plan prices "farm it yourself" from it.
 ns.Drops = {}
 function ns.Drops:Get(item) return ns.DROPS and ns.DROPS[item] end

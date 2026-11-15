@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------
 -- Nodes.lua — herbs and ore: every spot each one can spawn (Places.lua, from
--- NorgannonDB). One target at a time: a route to the nearest spot, never a
+-- VoidDB). One target at a time: a route to the nearest spot, never a
 -- cloud of dots on the map.
 --
 --   search "briarthorn", "tin vein"   -> route to the nearest spot it can spawn

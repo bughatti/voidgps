@@ -57,7 +57,7 @@ For a rare that doesn't always spawn, or any NPC you're heading to:
 
 ## Credits
 
-The WoW Forever NPC, rare, object, herb, ore, vendor recipe, mob drop and zeppelin data comes from **NorgannonDB** (GPL-3.0), built on **QuestieDB** and pfQuest. Thank you to both projects.
+The WoW Forever NPC, rare, object, herb, ore, vendor recipe, mob drop, skinnable beast, trainer and zeppelin data comes from VoidDB. **VoidDB**, the game data the Void addons ship, is built from Blizzard's game data, finds shared by Void players, and open data: NorgannonDB by Maro, QuestieDB, pfQuest by Shagu, DungeonJournal by Exehn and CMaNGOS classic-db (GPL-3.0; pfQuest MIT). Full credits and licences: NOTICE.txt in the addon folder. Thank you to all of them.
 
 ---
 
