@@ -1,5 +1,11 @@
 # VoidGPS Changelog
 
+## 0.8.1 — 2026-11-16
+
+- **Fixed: typing in the search box lagged the whole screen on every letter**, worst in a fight. It now searches once you pause typing (a little longer in combat), and each search is about ten times faster: a misspelled word that froze the game for most of a second now takes a blink. Enter, Tab and the arrow keys always act on what you typed.
+- The search list is prepared a few seconds after you log in (never in combat), so the first letter you type isn't the slow one.
+- Windows open in front of the Void windows already open, and come forward when you click them.
+
 ## 0.8.0 — 2026-11-15
 
 - **Credits:** the game data this addon ships is now called **VoidDB**; full credits and licences of the open data in it are in NOTICE.txt and the README.

@@ -19,6 +19,7 @@ local G = ns.G
 local Geo = ns.Geo
 local S = {}
 ns.Search = S
+G.SearchModule = S   -- (for /run timing checks: debugprofilestop around VoidGPS.SearchModule:Find(q))
 
 local A = { 0, 0.78, 1 }
 local FONT = "Fonts\\FRIZQT__.TTF"
@@ -108,6 +109,10 @@ local function buildIndex()
             end
         end
     end
+    -- word-start forms, made once (score() used to build them per entry per keystroke)
+    for _, list in ipairs({ index, goods }) do
+        for _, e in ipairs(list) do e.wn, e.ws = " " .. e.lname, " " .. (e.lsub or "") end
+    end
 end
 
 local function zoneByName(q)
@@ -126,13 +131,16 @@ local fuzzyAll = false   -- Find sets it for its second try, when nothing matche
 
 -- Typos: is q within 1 edit (2 for 6+ letters) of the start of n? A swap counts as one edit, so
 -- "ogr" and "ogrimmar" find Orgrimmar (the user, 2026-11-10: "it doesnt find ogr").
+-- (three rows reused for every call: the typo pass runs this over thousands of names, and a new
+-- table per row made each of those keystrokes freeze the screen, 2026-11-16)
+local R1, R2, R3 = {}, {}, {}
 local function editDist(a, b, maxd)
     local la, lb = #a, #b
     if math.abs(la - lb) > maxd then return maxd + 1 end
-    local prev2, prev, cur = {}, {}, {}
+    local prev2, prev, cur = R1, R2, R3
     for j = 0, lb do prev[j] = j end
     for i = 1, la do
-        cur = { [0] = i }
+        cur[0] = i
         local best = i
         local ai = a:byte(i)
         for j = 1, lb do
@@ -145,7 +153,7 @@ local function editDist(a, b, maxd)
             if v < best then best = v end
         end
         if best > maxd then return maxd + 1 end   -- can't get back under: stop early
-        prev2, prev = prev, cur
+        prev2, prev, cur = prev, cur, prev2   -- rotate: row i becomes prev, row i-1 prev2
     end
     return prev[lb]
 end
@@ -159,22 +167,28 @@ local function nearPrefix(n, q)
     return false
 end
 
-local function score(e, q, syn)
+-- e.wn / e.ws = " " .. name / " " .. sub, made once in buildIndex (building them for every entry on
+-- every keystroke was most of the garbage); qs = " " .. q, made once per search.
+local function score(e, q, syn, qs)
     local n, s = e.lname, e.lsub
     if n == q then return 1000 end
-    if n:sub(1, #q) == q then return 800 end
+    local at = n:find(q, 1, true)
+    if at == 1 then return 800 end
+    local ws = e.ws or (" " .. s)
     if syn then
         -- from the start of a word: "ore" is in "armorer" ("mining" listed Armorer & Shieldcrafters, 2026-11-10)
-        for _, t in ipairs(syn) do if s == t or (" " .. s):find(" " .. t, 1, true) then return 650 end end
+        for _, t in ipairs(syn) do if s == t or ws:find(" " .. t, 1, true) then return 650 end end
     end
-    if (" " .. n):find(" " .. q, 1, true) then return 600 end
+    qs = qs or (" " .. q)
+    if at and (e.wn or (" " .. n)):find(qs, 1, true) then return 600 end
     -- a service: from the start of a word, or anywhere for 4+ letters ("smith" -> Blacksmithing
     -- Supplies; "ore" must not find Armorers)
-    if s ~= "" and ((" " .. s):find(" " .. q, 1, true) or (#q >= 4 and s:find(q, 1, true))) then return 550 end
-    if n:find(q, 1, true) then return 400 end
-    -- a zone or city spelled a bit wrong: always (few of them); anything else: only when asked
+    if s ~= "" and (ws:find(qs, 1, true) or (#q >= 4 and s:find(q, 1, true))) then return 550 end
+    if at then return 400 end
+    -- a zone or city spelled a bit wrong: always (few of them); anything else: only when asked, and
+    -- only names starting with the same letter (the whole-list typo pass froze the screen per key)
     if e.kind == "zone" and nearPrefix(n, q) then return 620 end
-    if fuzzyAll and nearPrefix(n, q) then return 300 end
+    if fuzzyAll and n:byte(1) == q:byte(1) and nearPrefix(n, q) then return 300 end
     return 0
 end
 
@@ -233,10 +247,11 @@ function S:Find(q)
     local syn = SYN[q]
     local iq = ITEM_ALIAS[q]
     local hits, ih
+    local qs = " " .. q
     local function collect()
         hits, ih = {}, {}
         for _, e in ipairs(index) do
-            local sc = score(e, q, syn)
+            local sc = score(e, q, syn, qs)
             -- a quest reward ranks under a vendor selling the same item (the shop next to you, not a
             -- quest across the world: "mining pick" is also a Stepping Stones reward)
             if sc > 0 and e.kind == "reward" then sc = sc - 2 end
@@ -245,7 +260,7 @@ function S:Find(q)
         -- items vendors sell: the alias AND what you typed ("thread" -> Coarse Thread first, Fine
         -- Thread still listed; Sol review)
         for _, g in ipairs(goods or {}) do
-            local sc = score(g, q, nil)
+            local sc = score(g, q, nil, qs)
             if iq then sc = math.max(sc, score(g, iq, nil)) end
             if sc > 0 then ih[#ih + 1] = { g = g, s = sc - 1 } end   -- a place with the same name wins a tie
         end
@@ -435,7 +450,7 @@ local function makeWidget(parent, width, listParent)
         r.sub:SetWordWrap(false)
         r.sub:SetTextColor(0.6, 0.6, 0.66)
         r:SetScript("OnEnter", function() w.sel = i; w:Paint() end)
-        r:SetScript("OnClick", function() w:Choose(i) end)
+        r:SetScript("OnClick", function() w:Choose(i, true) end)
         w.rows[i] = r
         return r
     end
@@ -468,7 +483,14 @@ local function makeWidget(parent, width, listParent)
         self:Paint()
     end
 
-    function w:Choose(i)
+    function w:Choose(i, fromClick)
+        -- a row clicked while a search is still waiting belongs to the old text: show the new list
+        -- instead of routing somewhere you didn't mean (Sol review)
+        if fromClick and self.dirty then
+            self.dirty = nil
+            self:Update()
+            return
+        end
         local e = self.results[i]
         eb:ClearFocus()
         list:Hide()
@@ -476,20 +498,35 @@ local function makeWidget(parent, width, listParent)
         if self.onChosen then self.onChosen() end
     end
 
+    -- Search once you pause typing, not on every letter: a search over every NPC, item and quest
+    -- reward per keystroke lagged the whole screen, worst in a fight (the user, 2026-11-16). Enter and
+    -- the arrows run a waiting search first, so they always act on what's typed.
+    local pendingTok = 0
+    local function flush()
+        if w.dirty then w.dirty = nil; w:Update() end
+    end
     eb:SetScript("OnTextChanged", function(self)
-        hint:SetShown(self:GetText() == "")
-        w:Update()
+        local text = self:GetText()
+        hint:SetShown(text == "")
+        if text == "" then w.dirty = nil; w:Update() return end   -- recent places: instant
+        w.dirty = true
+        pendingTok = pendingTok + 1
+        local tok = pendingTok
+        C_Timer.After(InCombatLockdown() and 0.35 or 0.15, function()
+            if tok == pendingTok then flush() end
+        end)
     end)
-    eb:SetScript("OnEditFocusGained", function() w:Update() end)
+    eb:SetScript("OnEditFocusGained", function() w.dirty = nil; w:Update() end)
     eb:SetScript("OnEditFocusLost", function() C_Timer.After(0.2, function() if not eb:HasFocus() then list:Hide() end end) end)
     eb:SetScript("OnEscapePressed", function(self) self:ClearFocus(); list:Hide(); if w.onEscape then w.onEscape() end end)
-    eb:SetScript("OnEnterPressed", function() w:Choose(w.sel) end)
+    eb:SetScript("OnEnterPressed", function() flush(); w:Choose(w.sel) end)
     eb:SetScript("OnArrowPressed", function(_, key)
+        flush()
         if key == "DOWN" then w.sel = math.min(#w.results, w.sel + 1)
         elseif key == "UP" then w.sel = math.max(1, w.sel - 1) end
         w:Paint()
     end)
-    eb:SetScript("OnTabPressed", function() w.sel = (w.sel % math.max(1, #w.results)) + 1; w:Paint() end)
+    eb:SetScript("OnTabPressed", function() flush(); w.sel = (w.sel % math.max(1, #w.results)) + 1; w:Paint() end)
     widgets[#widgets + 1] = w
     return w
 end
@@ -625,4 +662,12 @@ G:OnReady(function()
     hostInVoidMap()
     if not inMap then C_Timer.After(1, hostInVoidMap) end
     if WorldMapFrame then WorldMapFrame:HookScript("OnShow", hostInVoidMap) end
+    -- build the search index a few seconds after login, out of combat, so the first letter you type
+    -- doesn't pay for it (it was the slowest keystroke of all)
+    local function warm()
+        if index then return end
+        if InCombatLockdown() then C_Timer.After(5, warm) return end
+        buildIndex()
+    end
+    C_Timer.After(6, warm)
 end)
