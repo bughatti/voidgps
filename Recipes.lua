@@ -23,8 +23,12 @@ local G, Geo = ns.G, ns.Geo
 
 local byItem   -- item -> entry (built once, for your faction)
 
+-- Built into a local table and only published when complete (the user, 2026-11-17: "probably why a lot of
+-- things fail in voidgps, some stuff doesnt work even though i know they exist"): an error part-way used
+-- to leave byItem half-built for the whole session, and every caller's pcall hid it. Each item a vendor
+-- was SEEN selling is merged on its own, so one odd item can't cut the rest short.
 local function build()
-    byItem = {}
+    local byItem = {}
     local fac = G:FactionLetter()
     local goods = ns.GOODS or {}
     for idx, list in pairs(ns.SELLS or {}) do
@@ -73,7 +77,7 @@ local function build()
         end
         for _, s in pairs(byName) do
             local cont, wx, wy = Geo.ToWorld(s.map, s.x, s.y)
-            for item, it in pairs(s.items) do
+            for item, it in pairs(s.items) do pcall(function()
                 local e = byItem[item]
                 if not e then
                     local name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(item)
@@ -99,13 +103,24 @@ local function build()
                         wx = wx, wy = wy, limited = it.limited or false, verified = true, cost = cost, rep = c and c.rep }
                     if not cost and it.buy then e.gold = true end
                 end
-            end
+            end) end
         end
     end
+    return byItem
 end
 
 -- a vendor scan learned a cost (Costs.lua): build again on next use
 function ns.GoodsDirty() byItem = nil end
+
+-- the index, built if needed: true when it's there. A failed build is reported like any Lua error and
+-- tried again on the next use, never kept half-done.
+local function ensure()
+    if byItem then return true end
+    local ok, t = pcall(build)
+    if ok then byItem = t; return true end
+    if geterrorhandler then geterrorhandler()(t) end
+    return false
+end
 
 -- a zone you're too low for (Zephras Isle at 31) goes last among far vendors (2026-11-10: the only
 -- other-continent Mining Pick vendors were Brill and Zephras Isle; the name decided)
@@ -145,7 +160,7 @@ local function make(onlyKind)
     local R = {}
     function R:All(kind)
         kind = onlyKind or kind
-        if not byItem then build() end
+        if not ensure() then return {} end
         local cont, px, py = Geo.Player()
         local out = {}
         for _, e in pairs(byItem) do
@@ -158,7 +173,7 @@ local function make(onlyKind)
         return out
     end
     function R:Get(item)
-        if not byItem then build() end
+        if not ensure() then return nil end
         local e = byItem[item]
         if not e or (onlyKind and e.kind ~= onlyKind) then return nil end
         local cont, px, py = Geo.Player()

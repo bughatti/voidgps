@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.8.2 — 2026-11-17
+
+- **Fixed: vendors that VoidGPS knows sometimes didn't show up.** One odd item a vendor was seen selling could stop the whole vendor list from loading for the rest of the session, and the error was hidden, so searches and VoidProf's "buy it here" lines came up empty for items that are sold. Each item is now added on its own, a problem is reported like any other addon error, and the list is tried again on next use instead of staying half-built.
+
 ## 0.8.1 — 2026-11-16
 
 - **Fixed: typing in the search box lagged the whole screen on every letter**, worst in a fight. It now searches once you pause typing (a little longer in combat), and each search is about ten times faster: a misspelled word that froze the game for most of a second now takes a blink. Enter, Tab and the arrow keys always act on what you typed.
