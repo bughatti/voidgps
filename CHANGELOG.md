@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.8.4 — 2026-11-18
+
+- **Quest search shows the right distance.** A quest's distance was to where it starts, even when it sent you to its objective or turn-in; now it's to where it sends you. A quest you already did shows no distance.
+
 ## 0.8.3 — 2026-11-18
 
 - **Search for a quest by name (WoW Forever, with VoidQuest).** "screecher spirits" takes you where the quest needs you now: its **giver** if you haven't taken it, the nearest thing it still needs if it's in your log, the **turn-in** once it's done; and it says so if you already did it. Searching a mob or object a quest needs says which quest it's for and who to take it from first (it used to send you to Feralas for a quest you hadn't picked up in Tanaris).

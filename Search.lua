@@ -506,6 +506,14 @@ function S:Find(q)
             -- where this quest sends you now: its giver, what it needs, or its turn-in
             local t = questTarget(e.qid) or { sub = "Quest" }
             e = { kind = "quest", name = e.name, qid = e.qid, sub = t.sub, map = t.map, x = t.x, y = t.y, npc = t.npc, target = t }
+            -- the distance shown is to where it sends you now (objective, turn-in), not where it starts;
+            -- none for a quest that's done or has no spot (in game 2026-11-18: "already done · 7,618 yd")
+            local qd
+            if t.map then
+                local c, wx, wy = Geo.ToWorld(t.map, t.x, t.y)
+                qd = (c and c == cont and px) and Geo.Dist(px, py, wx, wy) or nil
+            end
+            h = { e = h.e, s = h.s, d = qd }
         elseif e.kind == "npc" or e.kind == "rare" or e.kind == "obj" then
             -- a quest's creature or object: say which quest (worked out per search: you may take it later)
             local note = questNote(e.name)
