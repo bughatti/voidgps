@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.8.3 — 2026-11-18
+
+- **Search for a quest by name (WoW Forever, with VoidQuest).** "screecher spirits" takes you where the quest needs you now: its **giver** if you haven't taken it, the nearest thing it still needs if it's in your log, the **turn-in** once it's done; and it says so if you already did it. Searching a mob or object a quest needs says which quest it's for and who to take it from first (it used to send you to Feralas for a quest you hadn't picked up in Tanaris).
+
 ## 0.8.2 — 2026-11-17
 
 - **Fixed: vendors that VoidGPS knows sometimes didn't show up.** One odd item a vendor was seen selling could stop the whole vendor list from loading for the rest of the session, and the error was hidden, so searches and VoidProf's "buy it here" lines came up empty for items that are sold. Each item is now added on its own, a problem is reported like any other addon error, and the list is tried again on next use instead of staying half-built.

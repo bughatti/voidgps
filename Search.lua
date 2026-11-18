@@ -56,10 +56,12 @@ local ITEM_ALIAS = {
 ----------------------------------------------------------------------
 local index
 local goods   -- vendor items your faction can buy: { item, name, lname } (Recipes.lua's Goods)
+local quests  -- quest names (VoidQuest's data): searched from 3 letters on, so short queries stay fast
 
 local function buildIndex()
     index = {}
     goods = {}
+    quests = {}
     if ns.Goods then
         for _, e in ipairs(ns.Goods:All() or {}) do
             if e.name and #e.vendors > 0 then goods[#goods + 1] = { item = e.item, name = e.name, lname = e.name:lower(), lsub = "" } end
@@ -98,6 +100,21 @@ local function buildIndex()
                 npc = true, item = r[2], giver = r[7], quest = r[3], lname = r[1]:lower(), lsub = "quest reward" }
         end
     end
+    -- quests by name (WoW Forever, with VoidQuest's data). Where it sends you depends on where you are
+    -- with the quest (the user, 2026-11-18: "if i dont have a quest and i look it up, it make sense to send
+    -- me to the quest giver, not where the quest is"): questTarget() below, worked out when you search.
+    local vq = rawget(_G, "VoidQuest")
+    if vq and vq.ForeverQuests then
+        local side = vq.ForeverFaction or {}
+        for qid, r in pairs(vq.ForeverQuests) do
+            local title = type(r) == "table" and r[1]
+            local f = side[qid]
+            if type(title) == "string" and title ~= "" and f ~= "X" and (not f or fac == "" or f == fac) then
+                quests[#quests + 1] = { kind = "quest", qid = qid, name = title, sub = "Quest",
+                    lname = title:lower(), lsub = "quest" }
+            end
+        end
+    end
     local seen = {}
     for _, root in ipairs({ 946, 947 }) do
         for _, z in ipairs(C_Map.GetMapChildrenInfo(root, Enum.UIMapType.Zone, true) or {}) do
@@ -110,10 +127,159 @@ local function buildIndex()
         end
     end
     -- word-start forms, made once (score() used to build them per entry per keystroke)
-    for _, list in ipairs({ index, goods }) do
+    for _, list in ipairs({ index, goods, quests }) do
         for _, e in ipairs(list) do e.wn, e.ws = " " .. e.lname, " " .. (e.lsub or "") end
     end
 end
+
+----------------------------------------------------------------------
+-- Quests: where a quest sends you right now (VoidQuest's data, WoW Forever)
+--   not taken      -> its giver            done            -> nowhere ("done")
+--   in your log    -> the nearest spot of what it needs (kill / use / loot targets first, droppers next)
+--   ready          -> the turn-in NPC      (a step we have no spot for falls back to the giver)
+----------------------------------------------------------------------
+local function safeCall(fn, ...)
+    if type(fn) ~= "function" then return nil end
+    local ok, r = pcall(fn, ...)
+    if ok then return r end
+end
+
+-- a key's spots as world points, decoded once (Sol: not on every keystroke)
+local ptCache = {}
+local function pointsOf(vq, key)
+    local pts = ptCache[key]
+    if pts then return pts end
+    pts = {}
+    for map, s in pairs(vq.ForeverSpawns and vq.ForeverSpawns[key] or {}) do
+        for i = 1, #s - 5, 6 do
+            local x, y = tonumber(s:sub(i, i + 2)), tonumber(s:sub(i + 3, i + 5))
+            if x and y then
+                x, y = x / 1000, y / 1000
+                local c, wx, wy = Geo.ToWorld(map, x, y)
+                pts[#pts + 1] = { map = map, x = x, y = y, c = c, wx = wx, wy = wy }
+            end
+        end
+    end
+    ptCache[key] = pts
+    return pts
+end
+
+-- an objective you've already finished, by its name in the quest log ("Vale Screecher slain: 3/3")
+local function finishedFor(qid)
+    local done = {}
+    local objs = safeCall(C_QuestLog and C_QuestLog.GetQuestObjectives, qid)
+    for _, o in ipairs(type(objs) == "table" and objs or {}) do
+        if o.finished and type(o.text) == "string" and not (issecretvalue and issecretvalue(o.text)) then
+            done[#done + 1] = o.text:lower()
+        end
+    end
+    return done
+end
+
+local function nearestObjective(vq, qid)
+    local refs = vq.ForeverMobs and vq.ForeverMobs[qid]
+    if not refs then return nil end
+    local cont, px, py = Geo.Player()
+    local done = finishedFor(qid)
+    local function finished(name)
+        if not name then return false end
+        local l = name:lower()
+        for _, t in ipairs(done) do if t:find(l, 1, true) then return true end end
+        return false
+    end
+    for pass = 1, 2 do   -- 1: what the quest itself names; 2: mobs that drop what it needs
+        local best, bestD
+        for _, ref in ipairs(refs) do
+            local kind, key = ref[1], ref[2]
+            local dropper = kind == "d" or kind == "r"
+            local name = vq.ForeverMobNames and vq.ForeverMobNames[key] or nil
+            if (pass == 1) ~= dropper and not finished(name) then
+                for _, p in ipairs(pointsOf(vq, key)) do
+                    -- this continent first by distance; another continent after any here
+                    local d = (p.c and cont and p.c == cont and px) and Geo.Dist(px, py, p.wx, p.wy) or (p.c and 1e7 or 2e7)
+                    if not bestD or d < bestD then
+                        bestD = d
+                        best = { map = p.map, x = p.x, y = p.y, name = name }
+                    end
+                end
+            end
+        end
+        if best then return best end
+    end
+end
+
+-- { step, name, sub, map, x, y, npc } or { step = "done" } or nil (VoidQuest not loaded / no data)
+local function questTarget(qid)
+    local vq = rawget(_G, "VoidQuest")
+    if not (vq and qid) then return nil end
+    if safeCall(C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted, qid) then
+        return { step = "done", sub = "Quest · already done" }
+    end
+    local inLog = safeCall(C_QuestLog and C_QuestLog.GetLogIndexForQuestID, qid)
+    local St = vq.Starts
+    if inLog then
+        if safeCall(C_QuestLog and C_QuestLog.IsComplete, qid) then
+            local t = St and safeCall(St.TurninSpot, St, qid)
+            local who = St and safeCall(St.Turnin, St, qid)
+            if t and t.m then
+                return { step = "turn in", name = who or "turn-in", map = t.m, x = t.x, y = t.y, npc = true,
+                         sub = "Quest · ready: turn in to " .. (who or "the turn-in") .. " · " .. Geo.MapName(t.m) }
+            end
+        else
+            local o = nearestObjective(vq, qid)
+            if o then
+                return { step = "objective", name = o.name or "objective", map = o.map, x = o.x, y = o.y,
+                         sub = "Quest · in your log · " .. (o.name and (o.name .. ", ") or "") .. Geo.MapName(o.map) }
+            end
+        end
+    end
+    local s = St and safeCall(St.Get, St, qid)
+    local giver = St and safeCall(St.Giver, St, qid)
+    if s and s.m and s.x and s.y then
+        return { step = "pick up", name = giver or "quest giver", map = s.m, x = s.x, y = s.y, npc = s.how ~= "object",
+                 sub = (inLog and "Quest · in your log, from " or "Quest · take it from ") .. (giver or "its giver")
+                     .. " · " .. Geo.MapName(s.m) }
+    end
+    return { step = "unknown", sub = inLog and "Quest · in your log (no spot known)" or "Quest · where it starts isn't known yet" }
+end
+
+-- A creature or object a quest needs: "for 'Screecher Spirits': take it from Yeh'kinya first" (the user,
+-- 2026-11-18: VoidGPS sent them to Feralas for a quest they hadn't picked up yet). nil when it's no quest's.
+local questsOf   -- [lower name] = { qid, ... }
+local function questNote(name)
+    local vq = rawget(_G, "VoidQuest")
+    if not (vq and vq.ForeverMobs and vq.ForeverMobNames and name) then return nil end
+    if not questsOf then
+        questsOf = {}
+        for qid, refs in pairs(vq.ForeverMobs) do
+            for _, ref in ipairs(refs) do
+                local n = vq.ForeverMobNames[ref[2]]
+                if n then
+                    local l = n:lower()
+                    questsOf[l] = questsOf[l] or {}
+                    table.insert(questsOf[l], qid)
+                end
+            end
+        end
+    end
+    local fallback
+    for _, qid in ipairs(questsOf[name:lower()] or {}) do
+        local r = vq.ForeverQuests and vq.ForeverQuests[qid]
+        local title = r and r[1]
+        if title and not safeCall(C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted, qid) then
+            if safeCall(C_QuestLog and C_QuestLog.GetLogIndexForQuestID, qid) then
+                return ("for '%s' (in your log)"):format(title)
+            end
+            if not fallback then
+                local giver = vq.Starts and safeCall(vq.Starts.Giver, vq.Starts, qid)
+                fallback = giver and ("for '%s': take it from %s first"):format(title, giver)
+                    or ("for '%s' (not taken yet)"):format(title)
+            end
+        end
+    end
+    return fallback
+end
+S.QuestTarget, S.QuestNote = questTarget, questNote   -- (tools/cmd/vgps-quest-test)
 
 local function zoneByName(q)
     if not index then buildIndex() end
@@ -257,6 +423,15 @@ function S:Find(q)
             if sc > 0 and e.kind == "reward" then sc = sc - 2 end
             if sc > 0 then hits[#hits + 1] = { e = e, s = sc } end
         end
+        if #q >= 3 then
+            -- quests: the name only, no typo matching (4,600 names on every keystroke; the user, 2026-11-16:
+            -- "whenever i type in it it lags"). Same scale as score(): exact 1000, start 800, a word 600.
+            for _, e in ipairs(quests) do
+                local n = e.lname
+                local sc = (n == q and 1000) or (n:find(q, 1, true) == 1 and 800) or (e.wn:find(qs, 1, true) and 600) or 0
+                if sc > 0 then hits[#hits + 1] = { e = e, s = sc } end
+            end
+        end
         -- items vendors sell: the alias AND what you typed ("thread" -> Coarse Thread first, Fine
         -- Thread still listed; Sol review)
         for _, g in ipairs(goods or {}) do
@@ -297,6 +472,17 @@ function S:Find(q)
         local e = hits[i].e
         if hits[i].d then
             -- an item: its vendor's distance is already known
+        elseif e.kind == "quest" then
+            -- ranking only: where it starts (cheap). The real destination is worked out for the few shown
+            -- (questTarget below), not for every quest a short query matches (keystroke lag, 2026-11-16)
+            local vq = rawget(_G, "VoidQuest")
+            local t = vq and vq.Starts and safeCall(vq.Starts.Get, vq.Starts, e.qid)
+            if t and t.m and t.x then
+                local c, x, y = Geo.ToWorld(t.m, t.x, t.y)
+                hits[i].d = (c and c == cont) and Geo.Dist(px, py, x, y) or (c and 1e7 or 2e7)
+            else
+                hits[i].d = 2e7
+            end
         elseif e.kind == "node" then
             local _, _, _, _, yd = ns.Nodes:Nearest({ e.name })
             hits[i].d = yd or 1e7
@@ -316,11 +502,26 @@ function S:Find(q)
     for _, h in ipairs(hits) do
         if #out >= MAX then break end
         local e = h.e
+        if e.kind == "quest" then
+            -- where this quest sends you now: its giver, what it needs, or its turn-in
+            local t = questTarget(e.qid) or { sub = "Quest" }
+            e = { kind = "quest", name = e.name, qid = e.qid, sub = t.sub, map = t.map, x = t.x, y = t.y, npc = t.npc, target = t }
+        elseif e.kind == "npc" or e.kind == "rare" or e.kind == "obj" then
+            -- a quest's creature or object: say which quest (worked out per search: you may take it later)
+            local note = questNote(e.name)
+            if note then
+                local c = {}
+                for k2, v in pairs(e) do c[k2] = v end
+                c.sub = (e.sub and e.sub ~= "" and (e.sub .. " · ") or "") .. note
+                e = c
+            end
+        end
         local k = e.name .. "|" .. (e.map or 0) .. "|" .. math.floor((e.x or 0) * 100) .. "|" .. math.floor((e.y or 0) * 100)
         if not seen[k] then
             seen[k] = true
             out[#out + 1] = { name = e.name, sub = e.sub, map = e.map, x = e.x, y = e.y, kind = e.kind, npc = e.npc,
-                vendor = e.vendor, giver = e.giver, quest = e.quest, dist = h.d and h.d < 1e7 and h.d or nil }
+                vendor = e.vendor, giver = e.giver, quest = e.quest, qid = e.qid, target = e.target,
+                dist = h.d and h.d < 1e7 and h.d or nil }
         end
     end
     return out
@@ -339,6 +540,15 @@ local function go(r)
     end
     if r.kind == "item" and r.vendor and ns.Goods then
         ns.Goods:GoVendor(r.vendor, r.name)   -- the way to the vendor ("Sells Mining Pick")
+        return
+    end
+    if r.kind == "quest" then
+        -- where it sends you NOW: you may have taken, finished or turned it in since you typed (Sol)
+        local t = questTarget(r.qid) or r.target or {}
+        if not t.map then G:Print(r.name .. ": " .. (t.sub or r.sub or "no spot known")); return end
+        -- arrival names the NPC or creature; the subtitle says which quest and what to do there
+        ns.Guide:Start({ name = t.name or r.name, sub = r.name .. " · " .. (t.step or "quest"), map = t.map, x = t.x, y = t.y, npc = t.npc })
+        if WorldMapFrame and WorldMapFrame:IsShown() then WorldMapFrame:SetMapID(t.map) end
         return
     end
     if r.kind == "reward" and r.giver then
