@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.8.6 — 2026-11-20
+
+- **More places and rewards (WoW Forever).** Updated with WoW Forever's newest content: more NPCs, vendors and objects to search, and 2,969 quest rewards you can search for (was 2,682), among them rewards like Sword of Omen that had gone missing.
+
 ## 0.8.5 — 2026-11-20
 
 - **Quests with the same name (WoW Forever, with VoidQuest).** Hundreds of quests share a name with another part (Broken Alliances part 1 and 2). Search now lists every part, labelled "part 2 of 2" when the order is known, puts the part in your log first and done parts last, and says "not yet" for a part you can't take yet. Parts in the same state stay in order: part 1 above part 2.
