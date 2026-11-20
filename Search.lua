@@ -114,6 +114,61 @@ local function buildIndex()
                     lname = title:lower(), lsub = "quest" }
             end
         end
+        -- One name, several quests (the user, 2026-11-19: "i am on the second part of Broken Alliances and
+        -- voidgps doesnt seem to be able to find it, its only looking for the first part ... there are lots of
+        -- quests like this": 838 Forever titles are shared). Each part is its own result, numbered when the
+        -- chain proves the order (VoidQuest's ForeverRules: a part's earlier quests, py), and ranked by where
+        -- you are with it (Find: in your log first, done last).
+        local byName = {}
+        for _, e in ipairs(quests) do
+            byName[e.lname] = byName[e.lname] or {}
+            table.insert(byName[e.lname], e)
+        end
+        local rules = vq.ForeverRules or {}
+        for _, group in pairs(byName) do
+            if #group > 1 then
+                local inGroup = {}
+                for _, e in ipairs(group) do inGroup[e.qid] = true; e.shared = true end
+                -- how many same-named quests come before this one in its chain (walks earlier quests)
+                -- (Sol 2026-11-20: a visit-once `seen` cut a branch short -- Q4 needing Q2 and Q3 counted 2, not 3;
+                -- now the loop guard covers only the path being walked, and each answer is kept)
+                local memo, onPath = {}, {}
+                local function depth(q)
+                    if memo[q] then return memo[q] end
+                    if onPath[q] then return 0 end   -- a loop in the data
+                    onPath[q] = true
+                    local best = 0
+                    for _, p in ipairs((rules[q] and rules[q].py) or {}) do
+                        local d = depth(p) + (inGroup[p] and 1 or 0)
+                        if d > best then best = d end
+                    end
+                    onPath[q] = nil
+                    memo[q] = best
+                    return best
+                end
+                local chained = false
+                for _, e in ipairs(group) do
+                    e.depth = depth(e.qid)
+                    if e.depth > 0 then chained = true end
+                end
+                if chained then
+                    table.sort(group, function(a, b)
+                        if a.depth ~= b.depth then return a.depth < b.depth end
+                        return a.qid < b.qid
+                    end)
+                    -- parts only when every quest sits on one line (no two at the same step)
+                    local line = true
+                    for i = 2, #group do
+                        if group[i].depth == group[i - 1].depth then line = false end
+                    end
+                    if line then
+                        for i, e in ipairs(group) do
+                            e.name = ("%s (part %d of %d)"):format(e.name, i, #group)
+                        end
+                    end
+                end
+            end
+        end
     end
     local seen = {}
     for _, root in ipairs({ 946, 947 }) do
@@ -208,6 +263,48 @@ local function nearestObjective(vq, qid)
     end
 end
 
+-- A quest whose target only shows up after you do something at an object (VoidQuest's ForeverSteps: Facing
+-- Negolash -> load the Ruined Lifeboat with wine and buzzard wings, then Negolash comes out of the water). The
+-- user, 2026-11-20: "I'd like it to where it takes somebody to the boat first and then pop up the boss". The
+-- step counts as done once you hand in the object's little quest (QUEST_TURNED_IN, kept 20 min: the boss
+-- despawns, and then it's the boat again) or once an objective is finished.
+local STEP_FRESH = 20 * 60
+local function stepKey(qid) return tostring(UnitGUID("player") or "?") .. ":" .. qid end
+local function stepDone(qid)
+    local t = VoidGPSDB and VoidGPSDB.stepDone and VoidGPSDB.stepDone[stepKey(qid)]
+    return t and time() - t < STEP_FRESH or false
+end
+local function firstStep(vq, qid)
+    local s = vq.ForeverSteps and vq.ForeverSteps[qid]
+    if not s or stepDone(qid) or #finishedFor(qid) > 0 then return nil end
+    local cont, px, py = Geo.Player()
+    local best, bestD
+    for map, str in pairs(s.spots or {}) do
+        for i = 1, #str - 5, 6 do
+            local x, y = tonumber(str:sub(i, i + 2)), tonumber(str:sub(i + 3, i + 5))
+            if x and y then
+                x, y = x / 1000, y / 1000
+                local c, wx, wy = Geo.ToWorld(map, x, y)
+                local d = (c and cont and c == cont and px) and Geo.Dist(px, py, wx, wy) or (c and 1e7 or 2e7)
+                if not bestD or d < bestD then bestD, best = d, { map = map, x = x, y = y } end
+            end
+        end
+    end
+    if not best then return nil end
+    local bring = {}
+    for _, id in ipairs(s.items or {}) do
+        local n = C_Item and C_Item.GetItemNameByID and safeCall(C_Item.GetItemNameByID, id)
+        if type(n) == "string" then
+            bring[#bring + 1] = n
+        elseif C_Item and C_Item.RequestLoadItemDataByID then
+            safeCall(C_Item.RequestLoadItemDataByID, id)   -- not loaded yet: there next time you look
+        end
+    end
+    return { step = "first: " .. s.name, name = s.name, map = best.map, x = best.x, y = best.y, npc = false, stepOf = qid,
+             sub = "Quest · in your log · first: " .. s.name .. (#bring > 0 and (" (bring " .. table.concat(bring, ", ") .. ")") or "")
+                   .. " · " .. Geo.MapName(best.map) }
+end
+
 -- { step, name, sub, map, x, y, npc } or { step = "done" } or nil (VoidQuest not loaded / no data)
 local function questTarget(qid)
     local vq = rawget(_G, "VoidQuest")
@@ -226,6 +323,8 @@ local function questTarget(qid)
                          sub = "Quest · ready: turn in to " .. (who or "the turn-in") .. " · " .. Geo.MapName(t.m) }
             end
         else
+            local f = firstStep(vq, qid)   -- the boat before the boss
+            if f then return f end
             local o = nearestObjective(vq, qid)
             if o then
                 return { step = "objective", name = o.name or "objective", map = o.map, x = o.x, y = o.y,
@@ -235,10 +334,19 @@ local function questTarget(qid)
     end
     local s = St and safeCall(St.Get, St, qid)
     local giver = St and safeCall(St.Giver, St, qid)
+    -- not takeable yet (an earlier part, a level) or never: say so instead of "take it from" (2026-11-19,
+    -- Broken Alliances part 2 before part 1)
+    local state, why
+    if not inLog and vq.Forever and vq.Forever.Rule then
+        local ok, a, b = pcall(vq.Forever.Rule, vq.Forever, qid)
+        if ok then state, why = a, b end
+    end
     if s and s.m and s.x and s.y then
+        local how = (inLog and "Quest · in your log, from " or "Quest · take it from ") .. (giver or "its giver")
+        if state == "later" and why then how = "Quest · not yet: " .. why .. " · from " .. (giver or "its giver")
+        elseif state == "never" and why then how = "Quest · not for you: " .. why end
         return { step = "pick up", name = giver or "quest giver", map = s.m, x = s.x, y = s.y, npc = s.how ~= "object",
-                 sub = (inLog and "Quest · in your log, from " or "Quest · take it from ") .. (giver or "its giver")
-                     .. " · " .. Geo.MapName(s.m) }
+                 sub = how .. " · " .. Geo.MapName(s.m) }
     end
     return { step = "unknown", sub = inLog and "Quest · in your log (no spot known)" or "Quest · where it starts isn't known yet" }
 end
@@ -429,6 +537,15 @@ function S:Find(q)
             for _, e in ipairs(quests) do
                 local n = e.lname
                 local sc = (n == q and 1000) or (n:find(q, 1, true) == 1 and 800) or (e.wn:find(qs, 1, true) and 600) or 0
+                -- a name several quests share: the part you're on first, then ones still to do, done last
+                -- (only these: two quest-log calls each, not for every quest a short query matches)
+                if sc > 0 and e.shared then
+                    if safeCall(C_QuestLog and C_QuestLog.GetLogIndexForQuestID, e.qid) then
+                        sc = sc + 20
+                    elseif safeCall(C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted, e.qid) then
+                        sc = sc - 20
+                    end
+                end
                 if sc > 0 then hits[#hits + 1] = { e = e, s = sc } end
             end
         end
@@ -494,9 +611,27 @@ function S:Find(q)
     local kept = {}   -- a fresh list, not a nil-trimmed one (a sort over trailing nil slots can see nil)
     for i = 1, keep do kept[i] = hits[i] end
     hits = kept
+    -- parts of one quest name in the same state rank as one: by the nearest part's distance, then part order
+    -- (in game 2026-11-20: both done, part 2 showed above part 1 because its giver was nearer). One key per
+    -- hit, so the sort below stays a proper order.
+    local near = {}
+    for _, h in ipairs(hits) do
+        if h.e.shared then
+            local k = h.e.lname .. "\0" .. h.s
+            near[k] = math.min(near[k] or 3e7, h.d or 3e7)
+        end
+    end
+    for _, h in ipairs(hits) do
+        if h.e.shared then h.gd = near[h.e.lname .. "\0" .. h.s] end
+    end
     table.sort(hits, function(a, b)
         if a.s ~= b.s then return a.s > b.s end
-        return (a.d or 3e7) < (b.d or 3e7)
+        local ad, bd = a.gd or a.d or 3e7, b.gd or b.d or 3e7
+        if ad ~= bd then return ad < bd end
+        local ae, be = a.e, b.e
+        if (ae.lname or "") ~= (be.lname or "") then return (ae.lname or "") < (be.lname or "") end
+        if (ae.depth or 0) ~= (be.depth or 0) then return (ae.depth or 0) < (be.depth or 0) end
+        return (ae.name or "") < (be.name or "")   -- a full tie: by name, so the list never shuffles
     end)
     local seen = {}
     for _, h in ipairs(hits) do
@@ -524,7 +659,8 @@ function S:Find(q)
                 e = c
             end
         end
-        local k = e.name .. "|" .. (e.map or 0) .. "|" .. math.floor((e.x or 0) * 100) .. "|" .. math.floor((e.y or 0) * 100)
+        -- (a quest by its ID: two parts of one name with no spot each are still two results)
+        local k = (e.qid and ("q" .. e.qid .. "|") or "") .. e.name .. "|" .. (e.map or 0) .. "|" .. math.floor((e.x or 0) * 100) .. "|" .. math.floor((e.y or 0) * 100)
         if not seen[k] then
             seen[k] = true
             out[#out + 1] = { name = e.name, sub = e.sub, map = e.map, x = e.x, y = e.y, kind = e.kind, npc = e.npc,
@@ -555,7 +691,8 @@ local function go(r)
         local t = questTarget(r.qid) or r.target or {}
         if not t.map then G:Print(r.name .. ": " .. (t.sub or r.sub or "no spot known")); return end
         -- arrival names the NPC or creature; the subtitle says which quest and what to do there
-        ns.Guide:Start({ name = t.name or r.name, sub = r.name .. " · " .. (t.step or "quest"), map = t.map, x = t.x, y = t.y, npc = t.npc })
+        ns.Guide:Start({ name = t.name or r.name, sub = r.name .. " · " .. (t.step or "quest"), map = t.map, x = t.x, y = t.y, npc = t.npc,
+                         stepOf = t.stepOf, qname = r.name })
         if WorldMapFrame and WorldMapFrame:IsShown() then WorldMapFrame:SetMapID(t.map) end
         return
     end
@@ -888,4 +1025,32 @@ G:OnReady(function()
         buildIndex()
     end
     C_Timer.After(6, warm)
+end)
+
+-- The object's little quest handed in (Enticing Negolash at the lifeboat): the boss is coming. Remember it 20 min
+-- and, if the arrow was on the object, turn it to the boss (questTarget now skips the step).
+local stepEv = CreateFrame("Frame")
+stepEv:RegisterEvent("QUEST_TURNED_IN")
+stepEv:SetScript("OnEvent", function(_, _, questID)
+    local vq = rawget(_G, "VoidQuest")
+    local steps = vq and vq.ForeverSteps
+    if not (steps and questID and VoidGPSDB) then return end
+    for parent, s in pairs(steps) do
+        if s.child == questID and safeCall(C_QuestLog and C_QuestLog.GetLogIndexForQuestID, parent) then
+            local db = VoidGPSDB.stepDone or {}
+            VoidGPSDB.stepDone = db
+            for k, t in pairs(db) do if time() - t >= STEP_FRESH then db[k] = nil end end
+            db[stepKey(parent)] = time()
+            local a = ns.Guide and ns.Guide:Active()
+            if a and a.target and a.target.stepOf == parent then
+                local t = questTarget(parent)
+                if t and t.map then
+                    local qname = a.target.qname or "quest"
+                    ns.Guide:Start({ name = t.name or qname, sub = qname .. " · " .. (t.step or "quest"), map = t.map, x = t.x, y = t.y,
+                                     npc = t.npc, qname = qname })
+                    G:Print(("%s done: now %s."):format(s.name, t.name or "the objective"))
+                end
+            end
+        end
+    end
 end)

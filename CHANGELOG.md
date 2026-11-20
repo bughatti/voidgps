@@ -1,5 +1,10 @@
 # VoidGPS Changelog
 
+## 0.8.5 — 2026-11-20
+
+- **Quests with the same name (WoW Forever, with VoidQuest).** Hundreds of quests share a name with another part (Broken Alliances part 1 and 2). Search now lists every part, labelled "part 2 of 2" when the order is known, puts the part in your log first and done parts last, and says "not yet" for a part you can't take yet. Parts in the same state stay in order: part 1 above part 2.
+- **Summon quests: the object first, then the boss (WoW Forever, with VoidQuest).** For quests where you do something at an object before the target shows up, search now takes you to the object first. Facing Negolash goes to the Ruined Lifeboat on the shore (with what to bring), not to the spot in the water where Negolash comes out; Tremors of the Earth and Broken Alliances go to the Seal of the Earth, Bride of the Embalmer to the grave. Once you hand in at the object, the arrow turns to the boss by itself.
+
 ## 0.8.4 — 2026-11-18
 
 - **Quest search shows the right distance.** A quest's distance was to where it starts, even when it sent you to its objective or turn-in; now it's to where it sends you. A quest you already did shows no distance.
