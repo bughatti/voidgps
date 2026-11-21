@@ -1,5 +1,14 @@
 # VoidGPS Changelog
 
+## 0.8.7 — 2026-11-20
+
+- **No enemy towns.** Searching a place never offers the other faction's towns (Theramore, Southshore, Astranaar for the Horde; Crossroads, Tarren Mill for the Alliance), and flight paths on the map are only your faction's and neutral ones.
+- **Every flight path on the world map (WoW Forever).** Each zone, city and continent map shows your faction's flight masters: green = you have that flight path, yellow = not yet. Hover for the name, click one for a route there. Switch it off in the Void hub's quick box (Flight paths on the map).
+
+- **Named places and who's there (WoW Forever).** Search finds the named places inside a zone (Ravenholdt Manor, The Crossroads, Booty Bay...: 603 of them, from the game's own map) and lists the people there right under them: "ravenholdt" gives Ravenholdt Manor, then Fahrad, Lord Jorach Ravenholdt and the rest, not only the guards. Picking a place takes you to where its people are.
+- **Quests whose work is inside a dungeon (WoW Forever, with VoidDungeon).** A quest in your log with nothing to find outdoors now takes you to its dungeon's entrance (The Talisman of Kazdor: Zul'Farrak).
+- **Spots players measured come first.** NPCs, quest givers and the mobs for crafting materials and skinning are placed where VoidQuest and VoidGPS players actually met them, wherever someone has (562 NPCs, 188 quest givers, 400 material mobs, 149 skinning spots), else where the open data puts them.
+
 ## 0.8.6 — 2026-11-20
 
 - **More places and rewards (WoW Forever).** Updated with WoW Forever's newest content: more NPCs, vendors and objects to search, and 2,969 quest rewards you can search for (was 2,682), among them rewards like Sword of Omen that had gone missing.

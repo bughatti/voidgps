@@ -170,6 +170,52 @@ local function buildIndex()
             end
         end
     end
+    -- named places inside zones (Areas.lua, WoW Forever: the game's own map outlines), with who's there. The user,
+    -- 2026-11-20: "i need to go see people at ravenholt manor but that doesnt show in gps, just the mobs in that manor"
+    -- every NPC of a name per zone: several share one (Spirit Healer: Codex Sol 11-20, the last one won and a
+    -- place could send you to another Spirit Healer outside it). The one inside the place, else the nearest.
+    local npcAt = {}
+    for _, e in ipairs(index) do
+        if e.kind == "npc" then
+            local k = e.lname .. "@" .. e.map
+            local l = npcAt[k]
+            if not l then l = {}; npcAt[k] = l end
+            l[#l + 1] = e
+        end
+    end
+    local function pick(list, a)
+        if not list then return nil end
+        if #list == 1 then return list[1] end
+        local x1, y1, x2, y2 = (a[5] or 0) / 10000, (a[6] or 0) / 10000, (a[7] or 0) / 10000, (a[8] or 0) / 10000
+        local hx, hy = a[3] / 10000, a[4] / 10000
+        local best, bd
+        for _, e in ipairs(list) do
+            local inside = e.x and e.x >= x1 and e.x <= x2 and e.y >= y1 and e.y <= y2
+            local d = ((e.x or 9) - hx) ^ 2 + ((e.y or 9) - hy) ^ 2 - (inside and 100 or 0)
+            if not bd or d < bd then best, bd = e, d end
+        end
+        return best
+    end
+    for _, a in ipairs(ns.AREAS or {}) do
+      -- an enemy town (a[10] = its faction, vgps-areas) is never offered: the user, 2026-11-20, "i should not be
+      -- running around looking for a flight master of the opposite faction, nor should i see a quest giver of
+      -- the opposite faction"
+      local side = a[10] or ""
+      if side == "" or fac == "" or side == fac then
+        local who = {}
+        for n in (a[9] or ""):gmatch("[^;]+") do
+            local p = pick(npcAt[n:lower() .. "@" .. a[2]], a)   -- only people of your side (the NPC list is faction-filtered)
+            if p then who[#who + 1] = p end
+        end
+        local names = {}
+        for i = 1, math.min(3, #who) do names[i] = who[i].name end
+        local zi = C_Map.GetMapInfo(a[2])
+        index[#index + 1] = { kind = "place", name = a[1], map = a[2], x = a[3] / 10000, y = a[4] / 10000, people = who,
+            sub = "Place · " .. (zi and zi.name or "?") .. (#names > 0 and (" · " .. table.concat(names, ", ")
+                .. (#who > 3 and (" +" .. (#who - 3)) or "")) or ""),
+            lname = a[1]:lower(), lsub = "place" }
+      end
+    end
     local seen = {}
     for _, root in ipairs({ 946, 947 }) do
         for _, z in ipairs(C_Map.GetMapChildrenInfo(root, Enum.UIMapType.Zone, true) or {}) do
@@ -329,6 +375,22 @@ local function questTarget(qid)
             if o then
                 return { step = "objective", name = o.name or "objective", map = o.map, x = o.x, y = o.y,
                          sub = "Quest · in your log · " .. (o.name and (o.name .. ", ") or "") .. Geo.MapName(o.map) }
+            end
+            -- the work is inside a dungeon (VoidDungeon's dungeon quests): its nearest entrance. The user, 2026-11-20,
+            -- The Talisman of Kazdor (in Zul'Farrak): "i dont really see any real data about it other than what it says"
+            local vd = rawget(_G, "VoidDungeon")
+            local dn = vd and vd.DungeonOfQuest and safeCall(vd.DungeonOfQuest, vd, qid)
+            local at = dn and vd.EntranceOf and safeCall(vd.EntranceOf, vd, dn)
+            if type(at) == "table" and at[1] then
+                local cont, px, py = Geo.Player()
+                local best, bestD
+                for _, e in ipairs(at) do
+                    local c, wx, wy = Geo.ToWorld(e[1], e[2], e[3])
+                    local d = (c and cont and c == cont and px) and Geo.Dist(px, py, wx, wy) or (c and 1e7 or 2e7)
+                    if not bestD or d < bestD then best, bestD = e, d end
+                end
+                return { step = "inside " .. dn, name = dn .. " entrance", map = best[1], x = best[2], y = best[3], npc = false,
+                         sub = "Quest · in your log · inside " .. dn .. " · the entrance, " .. Geo.MapName(best[1]) }
             end
         end
     end
@@ -529,7 +591,21 @@ function S:Find(q)
             -- a quest reward ranks under a vendor selling the same item (the shop next to you, not a
             -- quest across the world: "mining pick" is also a Stepping Stones reward)
             if sc > 0 and e.kind == "reward" then sc = sc - 2 end
+            -- the place before mobs named after it; a place your words start ("ravenholdt") even before an NPC of
+            -- exactly that name (Hillsbrad's "Ravenholdt" came first; you wanted the manor and its people)
+            if sc > 0 and e.kind == "place" then sc = sc + (sc >= 800 and 201 or 1) end
             if sc > 0 then hits[#hits + 1] = { e = e, s = sc } end
+        end
+        -- a place found by name brings its people, right under it ("ravenholdt" -> Ravenholdt Manor, then Fahrad,
+        -- Lord Jorach Ravenholdt ...), not only the guards whose names match
+        local n = #hits
+        for i = 1, n do
+            local h = hits[i]
+            if h.e.kind == "place" and h.e.people and h.s >= 600 then
+                for j, p in ipairs(h.e.people) do
+                    hits[#hits + 1] = { e = p, s = h.s - 0.5 - j * 0.001 }
+                end
+            end
         end
         if #q >= 3 then
             -- quests: the name only, no typo matching (4,600 names on every keystroke; the user, 2026-11-16:
