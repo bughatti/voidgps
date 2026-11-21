@@ -76,7 +76,7 @@ local function dot()
         d:RegisterForClicks("LeftButtonUp")
         passRight(d)
         d.ring = d:CreateTexture(nil, "BACKGROUND")
-        d.ring:SetPoint("TOPLEFT", -1.5, 1.5); d.ring:SetPoint("BOTTOMRIGHT", 1.5, -1.5)
+        d.ring:SetPoint("TOPLEFT", -1, 1); d.ring:SetPoint("BOTTOMRIGHT", 1, -1)
         d.ring:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
         d.ring:SetVertexColor(0, 0, 0, 0.9)
         d.disc = d:CreateTexture(nil, "BORDER")
@@ -238,7 +238,8 @@ function provider:RefreshAllData()
     local scale = map:GetCanvasScale() or 1
     local info = C_Map.GetMapInfo(mapID)
     local cont = info and Enum.UIMapType and info.mapType == Enum.UIMapType.Continent
-    local size = (cont and 13 or 17) / scale
+    -- small, like a quest helper's marks (the user, 2026-11-21: "flight master circles are huge"; was 17 / 13)
+    local size = (cont and 8 or 11) / scale
     for _, n in ipairs(ns.FlightDots(mapID)) do
         local d = dot()
         d.node = n

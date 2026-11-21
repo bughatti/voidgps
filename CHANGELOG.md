@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.8.8 — 2026-11-21
+
+- **Smaller flight masters on the map.** The flight-path circles are about a third smaller on zone and continent maps.
+
 ## 0.8.7 — 2026-11-20
 
 - **No enemy towns.** Searching a place never offers the other faction's towns (Theramore, Southshore, Astranaar for the Horde; Crossroads, Tarren Mill for the Alliance), and flight paths on the map are only your faction's and neutral ones.
