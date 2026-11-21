@@ -25,8 +25,18 @@ local box, merchantBtn
 local hidden = false   -- closed with X: back when the list changes
 
 local function charKey()
-    local n, r = UnitName("player"), GetRealmName()
-    return (n or "?") .. "-" .. (r or "?")
+    local n, r = UnitName("player") or "?", GetRealmName()
+    if r and r ~= "" then return n .. "-" .. r end
+    -- WoW Forever, 2026-11-21: GetRealmName() turned blank on the PC client overnight; the list saved
+    -- under the name the game gave before is still this character's, when it's the only "Name-..." one
+    local found, prefix = nil, n .. "-"
+    for k in pairs(VoidGPSDB and VoidGPSDB.errands or {}) do
+        if type(k) == "string" and #k > #prefix and k:sub(1, #prefix) == prefix then
+            if found then return prefix end
+            found = k
+        end
+    end
+    return found or prefix
 end
 
 local function list()

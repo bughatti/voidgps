@@ -1,5 +1,9 @@
 # VoidGPS Changelog
 
+## 0.8.9 — 2026-11-21
+
+- **Fixed on WoW Forever: your flight paths and errands.** The game stopped telling addons your realm's name, so VoidGPS lost track of which flight paths you know (routes could use ones you haven't found yet) and of your errands list. It finds them again under the name they were saved with.
+
 ## 0.8.8 — 2026-11-21
 
 - **Smaller flight masters on the map.** The flight-path circles are about a third smaller on zone and continent maps.

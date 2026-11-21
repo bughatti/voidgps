@@ -211,10 +211,24 @@ end
 -- every flight path counts, as before; per continent, since a flight map lists that continent only.
 -- Name-Realm (Codex 11-12: GetUnitName("player", true) leaves your own realm off, so the same name on
 -- two realms shared one list). A list saved under the plain name moves over once.
+-- WoW Forever, 2026-11-21: GetRealmName() turned blank on the PC client overnight. The list saved under the
+-- name the game gave before is still this character's: used when it's the only "Name-..." one.
+local function soleKey(t, name)
+    if type(t) ~= "table" then return nil end
+    local prefix, found = name .. "-", nil
+    for k in pairs(t) do
+        if type(k) == "string" and #k > #prefix and k:sub(1, #prefix) == prefix then
+            if found then return nil end
+            found = k
+        end
+    end
+    return found
+end
 local function charKey()
     local name = UnitName("player") or "?"
     local realm = GetRealmName and GetRealmName()
-    return (realm and realm ~= "") and (name .. "-" .. realm:gsub("%s", "")) or name
+    if realm and realm ~= "" then return name .. "-" .. realm:gsub("%s", "") end
+    return soleKey(VoidGPSDB and VoidGPSDB.knownFP, name) or name
 end
 local function knownFP()
     local d = VoidGPSDB and VoidGPSDB.knownFP
