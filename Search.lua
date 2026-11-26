@@ -1130,3 +1130,7 @@ stepEv:SetScript("OnEvent", function(_, _, questID)
         end
     end
 end)
+
+-- Read-only hooks for the all-in-one VoidHub window (2026-11-24): the hub's GPS page searches with S:Find and
+-- starts the same route this box does. Nothing here changes the box.
+S.Hub = { Go = go, MapName = Geo.MapName, Yards = Geo.Yards, MAX = MAX }

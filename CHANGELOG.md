@@ -1,5 +1,10 @@
 # VoidGPS Changelog
 
+## 0.8.10 — 2026-11-25
+
+- **Rare popup inside dungeons:** the game hides a mob's name from addons inside dungeons, so the rare popup never showed there. It now shows the rare's name, level and a sound (no Target button inside dungeons: the game won't allow it).
+- **VoidHub window (WoW Forever):** right-click the VoidHub minimap button (or type /vhub) for every Void addon in one window: quests, layers, gear, gold, professions, combat, dungeons and more, each drawn from its own addon, with a Start page for what to do right now. Addons you don't have show a screenshot and how to get them. Shift + right-click opens Copy settings from another character. It comes inside every Void addon: nothing extra to install.
+
 ## 0.8.9 — 2026-11-21
 
 - **Fixed on WoW Forever: your flight paths and errands.** The game stopped telling addons your realm's name, so VoidGPS lost track of which flight paths you know (routes could use ones you haven't found yet) and of your errands list. It finds them again under the name they were saved with.

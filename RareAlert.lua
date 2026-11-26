@@ -230,6 +230,25 @@ function R:Show(name, cls, level)
     C_Timer.After(SHOW_FOR, function() if gen == mine then R:Hide() end end)
 end
 
+-- Inside dungeons the game hides a mob's name from addons (a secret value; measured 2026-11-14). The user,
+-- 2026-11-25, Blackmaw Hold: two rares, no popup, because every check gave up on the hidden name. A font
+-- string can still SHOW it; it just can't be compared, saved or put in a /targetexact macro. So this popup
+-- has the name, no Target button, and nothing to match a death against (it closes on its timer or with x).
+function R:ShowHidden(name, cls, level)
+    if not pop then return end
+    current = nil
+    hideButton()
+    pop.title:SetText((cls == "rareelite" and "RARE ELITE IS UP" or "RARE IS UP")
+        .. ((level and level > 0) and ("  (level " .. level .. ")") or ""))
+    pop.name:SetText(name)
+    pop:SetBackdropBorderColor(0.2, 1, 0.4, 0.9)
+    pop.note:SetText("In a dungeon: no Target button (the game hides the name)")
+    pop:Show()
+    gen = gen + 1
+    local mine = gen
+    C_Timer.After(SHOW_FOR, function() if gen == mine then R:Hide() end end)
+end
+
 -- The rare is dead: log it (first sight dead, or killed while the popup was up) and
 -- close the popup shortly after.
 function R:Dead(name, cls, how)

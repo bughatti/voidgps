@@ -93,10 +93,40 @@ local function anyRare(unit, name)
     end
 end
 
+-- A rare whose name the game hides (inside dungeons, 2026-11-25 Blackmaw Hold: no popup for two rares).
+-- Class, level and "can attack" stay readable there; anything still secret counts as unknown. The name
+-- can't be a table key, so one alert per class + level per 3 minutes.
+local seenHidden = {}
+local function plain(v) if issecretvalue and issecretvalue(v) then return nil end return v end
+local function hiddenRare(unit, name)
+    local cls = plain(UnitClassification(unit))
+    if cls ~= "rare" and cls ~= "rareelite" then return end
+    if plain(UnitCanAttack("player", unit)) == false or plain(UnitIsDead(unit)) then return end
+    local RA = ns.RareAlert
+    if VoidGPSDB and VoidGPSDB.rareAlerts == false then
+        if RA then RA:Log("(name hidden)", cls, howSeen(unit), "off") end
+        return
+    end
+    local lv = plain(UnitLevel(unit))
+    local key = cls .. ":" .. tostring(lv)
+    if seenHidden[key] and GetTime() - seenHidden[key] < 180 then return end
+    seenHidden[key] = GetTime()
+    PlaySound(SOUNDKIT.RAID_WARNING)
+    local what = cls == "rareelite" and "A rare elite" or "A rare"
+    G:Print(("|cff33ff33%s is here!|r%s (in a dungeon the game hides its name from addons: it's in the popup)"):format(
+        what, (lv and lv > 0) and (" Level " .. lv .. ".") or ""))
+    UIErrorsFrame:AddMessage(what .. " is here!", 0.2, 1, 0.2)
+    if RA then
+        RA:Log("(name hidden)", cls, howSeen(unit), "alert", lv)
+        RA:ShowHidden(name, cls, lv)
+    end
+end
+
 local function check(unit)
     if not UnitExists(unit) then return end
     local name = UnitName(unit)
-    if not name or (issecretvalue and issecretvalue(name)) then return end
+    if not name then return end
+    if issecretvalue and issecretvalue(name) then hiddenRare(unit, name); return end
     if name ~= H.name then anyRare(unit, name); return end
     local dead = UnitIsDead(unit)
     if ns.RareAlert then ns.RareAlert:Log(name, UnitClassification(unit), howSeen(unit), dead and "hunt, dead" or "hunt") end
